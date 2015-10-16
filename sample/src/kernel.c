@@ -116,10 +116,18 @@ void KernelStart(char *cmd_args[],
   // create idle process (see PCB.c)
   struct PCB *idle_proc = (struct PCB *) malloc(sizeof(struct PCB));
   idle_proc = new_process(uctxt);
+
   add_data(processes, (void *)idle_proc, 0);
+  idle_proc->uc->pc = &DoIdle;
   curr_proc = idle_proc;
 
-  curr_proc->uc->pc = &DoIdle;
+  
+  // uctxt = idle_proc->uc;
+  // uctxt->pc = idle_proc->uc->pc;
+  // uctxt->vector = idle_proc->uc->vector;
+
+  // memcpy(uctxt, idle_proc->uc, sizeof(idle_proc->uc)
+
   TracePrintf(1, "Made it to the end of KernelStart\n");
 } 
 
@@ -182,6 +190,8 @@ int SetKernelBrk(void * addr) {
     kernel_brk = addr;
     // Flush the TLB register
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_0);
+
+    TracePrintf(1, "Finishing SetKernelBrk\n");
     return 0;
   }
 } 
