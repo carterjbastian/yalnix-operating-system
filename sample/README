@@ -1,0 +1,14 @@
+The contents of this directory (/sample ) are structured as follows:
+
+FILES:
+console.c       Sample code / template for ...
+
+init.c          Sample code / template for an init processes that should be run
+                by the kernel on startup.
+
+shell.c         Sample code / template for ...
+
+template.c      Sample code / template for ...
+
+dot.gdbinit     A sample gdbinit file (which is copied and potentially modified
+                in the actual copy, ../.gdbinit.
