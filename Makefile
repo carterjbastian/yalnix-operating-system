@@ -21,7 +21,7 @@
 ALL = $(KERNEL_ALL) $(USER_APPS)
 KERNEL_ALL = yalnix
 SRCDIR = /media/sf_yalnix/src
-#SRCDIR = /media/sf_ringo/src  # I use this one b/c I named my folder differently
+#SRCDIR = /media/sf_ringo/src# I use this one b/c I named my folder differently
 
 #List all kernel source files here.  
 KERNEL_SRCS = $(SRCDIR)/kernel.c $(SRCDIR)/PCB.c $(SRCDIR)/linked_list.c $(SRCDIR)/traps.c

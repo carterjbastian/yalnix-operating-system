@@ -1,0 +1,10 @@
+The contents of this directory (/incl_copies ) is structured as follows:
+
+FILES:
+hardware.h          The provided header file for hardware-related constants,
+                    macros, and type definitions. Copied here for easy access.
+
+
+SUBDIRECTORIES:
+
+
