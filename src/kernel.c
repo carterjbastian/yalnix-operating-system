@@ -90,12 +90,16 @@ void KernelStart(char *cmd_args[],
     r0_pagetable[i] = entry;
   }
 
-  // Create pte items for the pages in R1
+  // Create pte items for the pages in R1 (pre-allocating pages)
   for (i = base_frame_r1; i < top_frame_r1; i++) {
-    struct pte entry;
+    struct pte entry; // New pte entry
+    // So far this page is invalid, has read/write protections, and has no
+    // physical frame.
     entry.valid = (u_long) 0x0;
     entry.prot = (u_long) (PROT_READ | PROT_WRITE);
     entry.pfn = (u_long) 0x0;
+    // Actually add the page to the pagetable
+    r1_pagetable[i] = entry;
   }
 
   // Set up the page tables in the right places with privileged hardware
@@ -111,22 +115,45 @@ void KernelStart(char *cmd_args[],
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   vm_en = 1; 
 
+  /* Create the linked list of processes */
   processes = (struct list *) malloc(sizeof(struct list));
 
-  // create idle process (see PCB.c)
-  struct PCB *idle_proc = (struct PCB *) malloc(sizeof(struct PCB));
-  idle_proc = new_process(uctxt);
-
-  add_data(processes, (void *)idle_proc, 0);
-  idle_proc->uc->pc = &DoIdle;
-  curr_proc = idle_proc;
-
+  /* create idle process (see PCB.c) */
+  //struct PCB *idle_proc = (struct PCB *) malloc(sizeof(struct PCB));
   
+  struct PCB *idle_proc = new_process(uctxt); // Allocates internally
+
+
+  /* Change the pc and sp of the new process' UserContext */
+  idle_proc->uc->pc = &DoIdle; // pc points to idle function
+ 
+  // Allocate a physical frame for the idle process' stack
+  struct node *free_frame = pop(&FrameList); // Pop a frame from the free frames
+  void *idle_stack = free_frame->data;
+  int idle_stack_fnum = free_frame->id;
+
+  // Update the r1 page table with validity & pfn
+  r1_pagetable[VMEM_1_LIMIT - 1].valid = (u_long) 0x1;
+  r1_pagetable[VMEM_1_LIMIT - 1].pfn = (u_long) ((PMEM_BASE + (idle_stack_fnum * PAGESIZE)) >> PAGESHIFT);
+
+  // flush the TLB region 1 since we changed r1_pagetable
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
+
+  /* Internal Book Keeping with new process */ 
+  curr_proc = idle_proc;                        // Track the current process running
+  add_data(processes, (void *)idle_proc, 0);    // update processes list with idle process
+
+
+  /* unnecessary? */
   // uctxt = idle_proc->uc;
   // uctxt->pc = idle_proc->uc->pc;
   // uctxt->vector = idle_proc->uc->vector;
 
-  // memcpy(uctxt, idle_proc->uc, sizeof(idle_proc->uc)
+  /* 
+   * Copy the newly created idle process' UserContext into the current
+   * UserContext with memcpy.
+   */
+  memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
 
   TracePrintf(1, "Made it to the end of KernelStart\n");
 } 
