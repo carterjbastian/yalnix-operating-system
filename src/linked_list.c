@@ -3,12 +3,12 @@
 #include "linked_list.h"
 
   // add data at end of last node 
-void add_data(struct list *list, void * data, int id) { 
-  struct node *new = malloc( sizeof(struct node) );
+void add_to_list(List *list, void *data, int id) { 
+  ListNode *new = malloc( sizeof(ListNode) );
   new->data = data;
   new->id = id;
     
-  struct node *node = list->first;
+  ListNode *node = list->first;
   if (!node) { 
     list->first = new;
     return;
@@ -24,8 +24,8 @@ void add_data(struct list *list, void * data, int id) {
 
 // remove data and reconnect the effected portions of 
 // our linked list 
-int remove_data(struct list *list, void * data) { 
-  struct node *node = list->first;
+int remove_from_list(List *list, void * data) { 
+  ListNode *node = list->first;
   while(node && node->data != data) { 
     node = node->next;
   }
@@ -42,8 +42,8 @@ int remove_data(struct list *list, void * data) {
   return 0;
 } 
 
-struct node* pop(struct list *list) { 
-  struct node *node = list->first;
+ListNode* pop(List *list) { 
+  ListNode *node = list->first;
   if (!node) return NULL;
   
   list->first = node->next;
@@ -54,9 +54,9 @@ struct node* pop(struct list *list) {
   return node;
 } 
 
-int count(struct list *list) { 
+int count_items(List *list) { 
   int count = 0;
-  struct node *node = list->first;
+  ListNode *node = list->first;
   while (node) { 
     count++;
     node = node->next;
@@ -66,8 +66,8 @@ int count(struct list *list) {
 } 
 
 
-struct node* find_by_id(struct list *list, int id) { 
-  struct node *node = list->first;
+ListNode* find_by_id(List *list, int id) { 
+  ListNode *node = list->first;
   while(node) { 
     if (node->id == id) { 
       return node;
@@ -77,8 +77,8 @@ struct node* find_by_id(struct list *list, int id) {
   return NULL;
 } 
 
-struct node* find_by_data(struct list *list, void * data) { 
-  struct node *node = list->first;
+ListNode* find_by_data(List *list, void * data) { 
+  ListNode *node = list->first;
   while(node) { 
     if (node->data == data) { 
       return node;
@@ -90,8 +90,8 @@ struct node* find_by_data(struct list *list, void * data) {
 
 // currently only works if data is int
 // just put this in for testing purposes
-void print_list(struct list *list) { 
-  struct node *node = list->first;
+void print_list(List *list) { 
+  ListNode *node = list->first;
   while(node) { 
     int *data = node->data;
     printf("%d\n", *data);

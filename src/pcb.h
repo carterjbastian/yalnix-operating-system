@@ -1,16 +1,20 @@
+#ifndef _PCB_H_
+#define _PCB_H_
+
+#include "linked_list.h"
 #include "PageTable.h"
 
-struct PCB { 
+typedef struct { 
   unsigned int proc_id;
   UserContext *uc; 
   struct pte *region0_pt;
   struct pte *region1_pt;
-  struct list *children;
-  struct list *exited_children;
+  List *children;
+  List *exited_children;
   int *delay_clock_ticks;
-};
+} PCB_t;
   
-struct PCB* new_process(UserContext *uc);
+PCB_t *new_process(UserContext *uc);
 
 // Functions to work with the Process Control Blocks
-
+#endif // _PCB_H_

@@ -5,9 +5,10 @@
  * What does this function actually do?
  * Run through this step by step to figure it out...
  */
-struct PCB * new_process(UserContext *uc) { 
-  struct PCB *pcb = (struct PCB *)malloc( sizeof(struct PCB) );
-  UserContext *new_uc;
+PCB_t *new_process(UserContext *uc) { 
+  PCB_t *pcb = (PCB_t *) malloc( sizeof(PCB_t) );
+  UserContext *new_uc = (UserContext *)malloc( sizeof(UserContext) );
+
   pcb->uc = new_uc;
   pcb->uc->vector = uc->vector;
   pcb->uc->code = uc->code;
@@ -15,8 +16,8 @@ struct PCB * new_process(UserContext *uc) {
   pcb->uc->pc = uc->pc;
   pcb->uc->sp = uc->sp;
 
+
   pcb->proc_id = available_process_id; 
   available_process_id++;
   return pcb;
-  // assign ptes here? 
 }

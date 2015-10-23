@@ -1,3 +1,6 @@
+#ifndef _TRAPS_H_
+#define _TRAPS_H_
+
 // traps.h
 #include <hardware.h>
 
@@ -18,3 +21,4 @@ void HANDLE_TRAP_MATH(UserContext *uc);
 void HANDLE_TRAP_TTY_RECEIVE(UserContext *uc);
 void HANDLE_TRAP_TTY_TRANSMIT(UserContext *uc);
 void HANDLE_TRAP_DISK(UserContext *uc);
+#endif // _TRAPS_H_
