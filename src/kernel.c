@@ -65,7 +65,7 @@ void KernelStart(char *cmd_args[],
   pframes_in_kernel = (VMEM_0_LIMIT >> PAGESHIFT);
   pframes_in_use = UP_TO_PAGE(kernel_brk) >> PAGESHIFT;
   int base_frame_r1 = DOWN_TO_PAGE(VMEM_1_BASE) >> PAGESHIFT;
-  int top_frame_r1 = DOWN_TO_PAGE(VMEM_1_LIMIT) >> PAGESHIFT;
+  int top_frame_r1 = UP_TO_PAGE(VMEM_1_LIMIT) >> PAGESHIFT;
   // Create the list of empty frames (storing the frame number as
   // the Node's ID)
   for (i = pframes_in_kernel; i < total_pframes; i++)
@@ -77,9 +77,9 @@ void KernelStart(char *cmd_args[],
     //entry.valid = ((i < pframes_in_use) ? (u_long) 0x1 : (u_long) 0x0);
     entry.valid = (u_long) 0x1;
     if ((i < pframes_in_use) || (i >= (KERNEL_STACK_BASE >> PAGESHIFT)))
-       entry.valid = 0x1;
+       entry.valid = (u_long) 0x1;
     else
-       entry.valid = 0x0; 
+       entry.valid = (u_long) 0x0; 
     
     if (i < (((unsigned int)kernel_data_start) >> PAGESHIFT))
       entry.prot = (u_long) (PROT_READ | PROT_EXEC); // exec and read protections
@@ -99,7 +99,7 @@ void KernelStart(char *cmd_args[],
     entry.prot = (u_long) (PROT_READ | PROT_WRITE);
     entry.pfn = (u_long) 0x0;
     // Actually add the page to the pagetable
-    r1_pagetable[i] = entry;
+    r1_pagetable[i - base_frame_r1] = entry;
   }
 
   // Set up the page tables in the right places with privileged hardware
@@ -117,32 +117,41 @@ void KernelStart(char *cmd_args[],
 
   /* Create the linked list of processes */
   processes = (struct list *) malloc(sizeof(struct list));
+  TracePrintf(1, "120\n");
 
   /* create idle process (see PCB.c) */
   //struct PCB *idle_proc = (struct PCB *) malloc(sizeof(struct PCB));
   
   struct PCB *idle_proc = new_process(uctxt); // Allocates internally
+  add_data(processes, (void *)idle_proc, 0);    // update processes list with idle process
 
 
   /* Change the pc and sp of the new process' UserContext */
   idle_proc->uc->pc = &DoIdle; // pc points to idle function
- 
+   TracePrintf(1, "130\n");
+
   // Allocate a physical frame for the idle process' stack
   struct node *free_frame = pop(&FrameList); // Pop a frame from the free frames
-  void *idle_stack = free_frame->data;
   int idle_stack_fnum = free_frame->id;
+  struct node *free_frame2 = pop(&FrameList);
+  int idle_stack_fnum2 = free_frame2->id;
 
   // Update the r1 page table with validity & pfn
-  r1_pagetable[VMEM_1_LIMIT - 1].valid = (u_long) 0x1;
-  r1_pagetable[VMEM_1_LIMIT - 1].pfn = (u_long) ((PMEM_BASE + (idle_stack_fnum * PAGESIZE)) >> PAGESHIFT);
+  r1_pagetable[VMEM_1_PAGE_COUNT - 1].valid = (u_long) 0x1;
+  r1_pagetable[VMEM_1_PAGE_COUNT - 1].pfn = (u_long) ((idle_stack_fnum * PAGESIZE) >> PAGESHIFT);
+  r1_pagetable[VMEM_1_PAGE_COUNT - 2].valid = (u_long) 0x1;
+  r1_pagetable[VMEM_1_PAGE_COUNT - 2].pfn = (u_long) ((idle_stack_fnum2 * PAGESIZE) >> PAGESHIFT);
+  // Assign the new process' context's stack pointer to the top of the stack
+  idle_proc->uc->sp = (void *) (VMEM_1_LIMIT - PAGESIZE);
 
+  TracePrintf(1, "140\n");
   // flush the TLB region 1 since we changed r1_pagetable
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
 
   /* Internal Book Keeping with new process */ 
   curr_proc = idle_proc;                        // Track the current process running
-  add_data(processes, (void *)idle_proc, 0);    // update processes list with idle process
 
+  TracePrintf(1, "148\n");
 
   /* unnecessary? */
   // uctxt = idle_proc->uc;
@@ -161,7 +170,7 @@ void KernelStart(char *cmd_args[],
 // idle function for testing
 void DoIdle() {
   while (1) {
-    TracePrintf(1, "DoIdle\n");
+    TracePrintf(1, "\t\tDoIdle\n");
     Pause();
   } 
 } 
@@ -197,10 +206,11 @@ int SetKernelBrk(void * addr) {
   // After enabling virtual memory
   } else {
     // Get the page values of the integers
-    unsigned int bottom_page = VMEM_BASE >> PAGESHIFT;
+    unsigned int bottom_page = VMEM_0_BASE >> PAGESHIFT;
     unsigned int addr_page = DOWN_TO_PAGE(addr) >> PAGESHIFT;
     unsigned int bottom_of_stack = DOWN_TO_PAGE(KERNEL_STACK_BASE) >> PAGESHIFT;
 
+    TracePrintf(1, "SKB: starting bottom half of loop\n");
     // Loop through each vm page in the kernel up to the new break
     for (i = bottom_page; i <= addr_page; i++) {
         // Update pagetable if a page that should be valid is not
@@ -208,13 +218,16 @@ int SetKernelBrk(void * addr) {
             r0_pagetable[i].valid = (u_long) 0x1; // Update the page table entry
         
     }
+    TracePrintf(1, "SKB: through bottom half of loop\n");
     // Loop through what should be unallocated memory
     for (i = addr_page + 1; i < bottom_of_stack; i++) {
         // If the page is allocated, we need to free it
         if (r0_pagetable[i].valid == 0x1) 
             r0_pagetable[i].valid = (u_long) 0x0; // Update the page table
     }
+    TracePrintf(1, "SKB: through top half of loop\n");
     kernel_brk = addr;
+
     // Flush the TLB register
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_0);
 
