@@ -49,12 +49,18 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
   // perform context switch to ready_proccesses.first()
   // should implement round-robin process scheduling with 
   // cpu quantum per process of 1 clock tick
-
-  // for each process in processes: 
-  //   if(process.delay_clock_ticks > 0)
-  //     process.delay_clock_ticks--;
-  //     if (process.delay_clock_ticks == 0)
-  //       
+  
+  int i;
+  for (i = 0; i < count_items(delayed_processes), i++) { 
+    PCB *proc = delayed_processes[i]->data;
+    proc->delay_clock_ticks -= 1;
+    if (proc->delay_clock_ticks <= 0) { 
+      add_data(ready_processes, proc, proc->id);
+    } 
+  } 
+  
+  PCB *next_proc = pop(ready_processes);
+  perform_context_switch(curr_proc, next_proc);
 } 
 
 /*

@@ -23,7 +23,6 @@ Void Yalnix_Exit(int status) {
 int Yalnix_Wait(int *status_ptr) { 
   // empty exited_children
   // switch to another available process
-
 } 
 
 int Yalnix_GetPid() { 
@@ -41,18 +40,19 @@ int Yalnix_Brk(void *addr) {
     TracePrintf(1, "Brk Error: not enough memory available");
     return ERROR;
   } 
-
-  
-  
   
 }
 
 int Yalnix_Delay(int clock_ticks) { 
   if (clock_ticks < 0) return ERROR;
-  if (clock_ticks == 0) return 0;
-  clock_t t = clock();
-  while(t - clock_ticks > 0){};
-  return;
+  if (clock_ticks == 0) return SUCCESS;
+
+  add_to_list(delayed_processes, curr_proc, curr_proc->pid);
+  curr_proc->delayed_clock_ticks = clock_ticks;
+  PCB *next_proc = pop(ready_processes)->data;
+  perform_context_switch(curr_proc, next_proc);
+  
+  return SUCCESS;
 } 
 
 int Yalnix_Reclaim(int id) { 
