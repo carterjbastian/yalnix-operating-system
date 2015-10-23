@@ -47,9 +47,9 @@ int Yalnix_Delay(int clock_ticks) {
   if (clock_ticks < 0) return ERROR;
   if (clock_ticks == 0) return SUCCESS;
 
-  add_to_list(delayed_processes, curr_proc, curr_proc->pid);
-  curr_proc->delayed_clock_ticks = clock_ticks;
-  PCB *next_proc = pop(ready_processes)->data;
+  add_to_list(blocked_procs, curr_proc, curr_proc->pid);
+  curr_proc->delay_clock_ticks = clock_ticks;
+  PCB *next_proc = pop(ready_procs)->data;
   perform_context_switch(curr_proc, next_proc);
   
   return SUCCESS;

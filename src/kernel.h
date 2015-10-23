@@ -41,9 +41,10 @@ unsigned int available_process_id;
 unsigned int total_pframes;
 
 // process queues
-List *ready_processes;
-List *processes;
-List *terminated_processes;
+List *ready_procs;
+List *blocked_procs;
+List *procs;
+List *dead_procs;
 
 
 /*

@@ -6,6 +6,9 @@
 #include "syscalls/pipes.h"
 #include "syscalls/tty.h"
 
+#include "kernel.h"
+#include "linked_list.h"
+
 // used by a couple different traps
 void abort_process(int pid) { 
 } 
@@ -51,16 +54,26 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
   // cpu quantum per process of 1 clock tick
   
   int i;
-  for (i = 0; i < count_items(delayed_processes), i++) { 
-    PCB *proc = delayed_processes[i]->data;
+  ListNode *iterator = blocked_procs->first;
+
+
+  for (i = 0; i < count_items(blocked_procs); i++) { 
+    PCB_t *proc = iterator->data;
     proc->delay_clock_ticks -= 1;
     if (proc->delay_clock_ticks <= 0) { 
-      add_data(ready_processes, proc, proc->id);
-    } 
+      add_to_list(ready_procs, proc, proc->proc_id);
+    }
+   iterator = iterator->next; 
   } 
-  
-  PCB *next_proc = pop(ready_processes);
-  perform_context_switch(curr_proc, next_proc);
+
+  // Are there more processes waiting?
+  if (count_items(ready_procs) > 0) { 
+    PCB_t *next_proc = pop(ready_procs)->data;
+
+    if (perform_context_switch(curr_proc, next_proc) != 0) {
+      TracePrintf(1, "Context Switch failed\n");
+    }
+  }
 } 
 
 /*

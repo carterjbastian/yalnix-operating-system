@@ -13,7 +13,7 @@ typedef struct Node {
 
 // List data structure
 typedef struct List { 
-  void *first; // void *?
+  ListNode *first; // void *?
 } List;
 
 // Functions related to the linked lists
