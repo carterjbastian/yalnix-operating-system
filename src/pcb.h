@@ -2,9 +2,12 @@
 #define _PCB_H_
 
 #include "linked_list.h"
-#include "PageTable.h"
+//#include "PageTable.h"
 
-typedef struct { 
+/*
+ * Type Definitions and Structures
+ */
+typedef struct PCB_t { 
   unsigned int proc_id;
   UserContext *uc; 
   struct pte *region0_pt;
@@ -14,6 +17,9 @@ typedef struct {
   int *delay_clock_ticks;
 } PCB_t;
   
+/*
+ * Function Declarations
+ */
 PCB_t *new_process(UserContext *uc);
 
 // Functions to work with the Process Control Blocks

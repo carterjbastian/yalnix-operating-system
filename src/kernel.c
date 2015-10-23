@@ -1,3 +1,6 @@
+/*
+ * Local Includes
+ */
 #include "kernel.h"
 #include "hardware.h"
 #include "linked_list.h"
@@ -43,9 +46,9 @@ void SetKernelData(void * _KernelDataStart, void *_KernelDataEnd) {
 }
 
 /* 
-Completes init and sets up first userland process, 
-and passes pointer to a UserContext
-*/
+ * Completes init and sets up first userland process, 
+ * and passes pointer to a UserContext
+ */
 void KernelStart(char *cmd_args[], 
                  unsigned int pmem_size,
                  UserContext *uctxt) { 
@@ -76,6 +79,7 @@ void KernelStart(char *cmd_args[],
 
   // Set up page tables for what's already in use.
   for (i = 0; i < pframes_in_kernel; i++) {
+    // Create an empty page table entry structure
     struct pte entry;
     
     // Assign validity
@@ -120,10 +124,6 @@ void KernelStart(char *cmd_args[],
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   vm_en = 1; 
 
-  /* Create the linked list of processes */
-  //processes = (List *) malloc(sizeof(List));
-  TracePrintf(1, "120\n");
-
   /* create idle process (see PCB.c) */
   PCB_t *idle_proc = new_process(uctxt); // Allocates internally
   add_to_list(&ProcessList, (void *)idle_proc, 0);    // update processes list with idle process
@@ -143,8 +143,13 @@ void KernelStart(char *cmd_args[],
   r1_pagetable[VMEM_1_PAGE_COUNT - 1].pfn = (u_long) ((idle_stack_fnum * PAGESIZE) >> PAGESHIFT);
   r1_pagetable[VMEM_1_PAGE_COUNT - 2].valid = (u_long) 0x1;
   r1_pagetable[VMEM_1_PAGE_COUNT - 2].pfn = (u_long) ((idle_stack_fnum2 * PAGESIZE) >> PAGESHIFT);
+
   // Assign the new process' context's stack pointer to the top of the stack
   idle_proc->uc->sp = (void *) (VMEM_1_LIMIT - PAGESIZE);
+
+  /* Store pointers to the first page table entries in the PCB instance */
+  idle_proc->region0_pt = &r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT];
+  idle_proc->region1_pt = r1_pagetable;
 
   // flush the TLB region 1 since we changed r1_pagetable
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
@@ -165,7 +170,7 @@ void KernelStart(char *cmd_args[],
 // idle function for testing
 void DoIdle() {
   while (1) {
-    TracePrintf(1, "\t\tDoIdle\n");
+    TracePrintf(1, "\tDoIdle\n");
     Pause();
   } 
 } 
