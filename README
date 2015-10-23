@@ -1,0 +1,20 @@
+The contents of this folder are structured as follows:
+
+FILES:
+Makefile:   a sample makefile (set up to build and link your kernel)
+
+.gdbinit:   a sample .gdbinit, to permit using gdb to debug your kernel
+
+.gitignore: an ignore file to prevent git from picking up unnecessary files
+
+
+DIRECTORIES:
+incl_copies/:   Copies of important provided header files for easy reference.
+
+sample/:        Copies of template and reference code provided in the sample
+                folder in the vm's /yalnix directory.
+
+src/:           All actual source code for the operating system.
+
+test/:          user-level programs for testing various aspects and
+                functionalities of yalnix.

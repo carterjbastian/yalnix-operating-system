@@ -1,0 +1,30 @@
+The contents of this directory (/src ) are structured as follows:
+
+FILES:
+PCB.c/.h            Defines the Process Control Block (PCB) data structure as
+                    well as the functions and routines capable of working with 
+                    it.
+
+PageTable.c/.h      Defines the function interface with which yalnix can
+                    interact with PageTables (generating, modifying, etc.)
+                    So far, unused... may be unnecessary due to changing design.
+
+kernel.c/.h         Declares all global kernel variables, implements critical 
+                    kernel functionalities including the following routines:
+                        - SetKernelData()
+                        - KernelStart()
+                        - SetKernelBrk()
+                        - DoIdle()
+                        etc..
+
+linked_list.c/.h    A general-purpose linked-list data structure for use
+                    throughout the project.
+
+traps.c/.h          Defines the trap_handler_func type, creates the Interrupt
+                    Vector Table, and implements trap handling functions.
+
+
+SUBDIRECTORIES:
+syscalls/           Contains the source code that implements the functionalities
+                    related to system call requests from user code.
+

@@ -1,10 +1,14 @@
-FYI:
+The contents of this directory (/sample ) are structured as follows:
 
-Makefile:   a sample makefile (set up to build and link your kernel)
-.gdbinit:   a sample .gdbinit, to permit using gdb to debug your kernel
-template.c: a template for implementing LoadProgram
+FILES:
+console.c       Sample code / template for ...
 
-console.c,  init.c,   shell.c: sample user-level programs
+init.c          Sample code / template for an init processes that should be run
+                by the kernel on startup.
 
-test/: some sample user-level programs for testing
+shell.c         Sample code / template for ...
 
+template.c      Sample code / template for ...
+
+dot.gdbinit     A sample gdbinit file (which is copied and potentially modified
+                in the actual copy, ../.gdbinit.
