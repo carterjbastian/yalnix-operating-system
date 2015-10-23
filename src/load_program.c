@@ -3,13 +3,19 @@
 // ==>> marked with "// ==>>".  You must replace these lines with your own code.
 // ==>> You might also want to save the original annotations as comments.
 
+/*
+ * System Inlcludes
+ */
 #include <fcntl.h>
 #include <unistd.h>
 #include <hardware.h>
 #include <load_info.h>
-// ==>> #include anything you need for your kernel here
+
+/*
+ * Local Includes
+ */
 #include "kernel.h" 
-#include "pcb.h"
+#include "PCB.h"
 
 /*
  *  Load a program into an existing address space.  The program comes from
@@ -19,7 +25,7 @@
  *  is to be loaded. 
  */
 int
-LoadProgram(char *name, char *args[], PCB *proc) 
+LoadProgram(char *name, char *args[], PCB_t *proc) 
 // ==>> Declare the argument "proc" to be a pointer to your PCB or
 // ==>> process descriptor data structure.  We assume you have a member
 // ==>> of this structure used to hold the cpu context 

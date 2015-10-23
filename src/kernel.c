@@ -234,4 +234,34 @@ int SetKernelBrk(void * addr) {
     TracePrintf(1, "Finishing SetKernelBrk\n");
     return 0;
   }
-} 
+}
+
+
+KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
+    int i, j;
+    PCB *curr = (PCB *) curr_pcb_p;
+    PCB *next = (PCB *) next_pcb_p;
+    curr->kc = kc_in; // Store the kernel context
+    
+    // Store current proc's region 0 and 1 pointers
+    curr->region0_pt = &r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT];
+    curr->region1_pt = &r1_pagetable[0];
+
+    // Restore the next_pcb_p's kernel stack
+    for (i = (KERNEL_STACK_BASE >> PAGESHIFT); i < (VMEM_0_PAGE_COUNT); i++) {
+        j = i - (KERNEL_STACK_BASE >> PAGESHIFT);
+        r0_pagetable[i] = (void *) (next->region0_pt + j);
+    }
+
+    // Restore the next proc's region 1 page table
+    for (i = 0; i < VMEM_1_PAGE_COUNT; i++)
+        r1_pagetable[i] = next->region1_pt + i;
+   
+    // Flush the TLB
+    RegisterWrite(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+
+    // Put the old process on the ready queue
+    add_to_list(ready_processes, curr_pcb_p, curr->proc_id);
+
+    return next->kc;
+}
