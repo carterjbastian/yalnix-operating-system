@@ -156,7 +156,6 @@ void KernelStart(char *cmd_args[],
   add_to_list(all_procs, (void *)idle_proc, idle_proc->proc_id);    // update processes list with idle process
   curr_proc = idle_proc;
 
-  TracePrintf(1, "Starting to load the program in from mem\n");
 
   // Make the init process
   PCB_t *init_proc = new_process(idle_proc->uc);
@@ -167,21 +166,29 @@ void KernelStart(char *cmd_args[],
   init_proc->region0_pt = (struct pte *)malloc((KERNEL_STACK_MAXSIZE / PAGESIZE)  * sizeof(struct pte));
   init_proc->region1_pt = (struct pte *)malloc(VMEM_1_PAGE_COUNT * sizeof(struct pte));
 
+  TracePrintf(1, "Initializing r1 mem\n");
+
   // Initialize this memory space
   for (i = 0; i < VMEM_1_PAGE_COUNT; i++) {
     
     (*(init_proc->region1_pt + i)).valid = (u_long) 0x0;
     (*(init_proc->region1_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
   }
+  TracePrintf(1, "Initializing r0 mem\n");
+
   for (i = 0; i < KERNEL_STACK_MAXSIZE / PAGESIZE; i++) {
     (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
     (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
-    memcpy((void *)(PMEM_BASE + (*(init_proc->region0_pt + i)).pfn * PAGESIZE),
-            (void *)&(r0_pagetable[i]), PAGESIZE);
-  }
+    TracePrintf(1, "Flushing for i = %d\n", i);
 
-  
+  }
+    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+  unsigned int dest = PMEM_BASE + (((unsigned int) (*(idle_proc->region0_pt)).pfn) * PAGESIZE);
+  unsigned int src = PMEM_BASE + (r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT].pfn * PAGESIZE);
+
+  memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
+   TracePrintf(1, "Starting to load the program in from mem\n");
   //for (i = 0; 
   char *arglist[] = {"init", '\0'};
   char *progname = "./usr_progs/init";
