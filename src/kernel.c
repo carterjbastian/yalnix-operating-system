@@ -199,10 +199,8 @@ void KernelStart(char *cmd_args[],
 
 
    TracePrintf(1, "Starting to load the program in from mem\n");
-  //for (i = 0; 
   char *arglist[] = {"init", '\0'};
   char *progname = "./usr_progs/init";
-  //int c_switch_rc = first_context_switch(curr_proc, init_proc, progname, arglist);
   
   int lp_rc = LoadProgram(progname, arglist, init_proc);
 
@@ -210,7 +208,7 @@ void KernelStart(char *cmd_args[],
   TracePrintf(1, "Made it to the end of KernelStart\n");
 
   unsigned int dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg) << PAGESHIFT;
-  unsigned int src = ((KERNEL_STACK_BASE >> PAGESHIFT) << PAGESHIFT);
+  unsigned int src = KERNEL_STACK_BASE;
   memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
 
 
@@ -259,6 +257,7 @@ int SetKernelBrk(void * addr) {
       if ((unsigned int)addr > (unsigned int)kernel_brk)
           kernel_brk = addr;
       return 0;
+
   // After enabling virtual memory
   } else {
     // Get the page values of the integers
@@ -299,39 +298,26 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     PCB_t *curr = (PCB_t *) curr_pcb_p;
     PCB_t *next = (PCB_t *) next_pcb_p;
 
-    //((PCB_t *)curr_pcb_p)->kc = kc_in; // Store the kernel context
-    memcpy( (void *) &(curr->kc), kc_in, sizeof(KernelContext));
+    // Copy the kernel context
+    memcpy( (void *) (curr->kc_p), (void *)kc_in, sizeof(KernelContext));
+    curr->kc_set = 1;
     if (next->kc_set == 0) {
-        memcpy( (void *) &(next->kc), kc_in, sizeof(KernelContext));
+        memcpy( (void *) (next->kc_p), (void *)kc_in, sizeof(KernelContext));
+        next->kc_set = 1;
     }
-    // Store the current process' kernel stack
     
-    // Restore the next_pcb_p's kernel stack
-    //for (i = (KERNEL_STACK_BASE >> PAGESHIFT); 
-    //    i < (DOWN_TO_PAGE(KERNEL_STACK_LIMIT) >> PAGESHIFT);
-    //        i++) {
-    //    j = i - (KERNEL_STACK_BASE >> PAGESHIFT);
-    //    r0_pagetable[i] = *(next->region0_pt + j);
-    //}
-
-
-    // Restore the next proc's region 1 page table
-    //for (i = 0; i < VMEM_1_PAGE_COUNT; i++)
-    //    r1_pagetable[i] = *(next->region1_pt + i);
-    //struct pte **r1_pagetable_pt = &r1_pagetable;
-    //r1_pagetable_pt = &(next->region1_pt);
-
     //Restore the next region's kernel stack
     memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
             (void *) next->region0_pt,
             ks_npg * (sizeof(struct pte)));
 
     WriteRegister(REG_PTBR1, (unsigned int) next->region1_pt);
+
     // Flush the TLB
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
     TracePrintf(1, "\t==> MyKCS done\n");
-    return &next->kc;
+    return next->kc_p;
 }
 
 
@@ -341,8 +327,8 @@ int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
     curr->uc = uc;
     
     // Store current proc's region 0 and 1 pointers
-    //memcpy((void *)curr->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
-    //curr->region1_pt = &r1_pagetable[0];
+    memcpy((void *)curr->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
+    curr->region1_pt = &r1_pagetable[0];
 
     // Put the old process on the ready queue
     add_to_list(ready_procs, (void *) curr, curr->proc_id);

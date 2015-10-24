@@ -26,7 +26,7 @@ PCB_t *new_process(UserContext *uc) {
   // Give it a new process ID
   pcb->proc_id = available_process_id; 
   available_process_id++;
-
+  pcb->kc_p = (KernelContext *)malloc(sizeof(KernelContext));
   // Default value for kc
   return pcb;
 }
