@@ -150,9 +150,9 @@ void KernelStart(char *cmd_args[],
   idle_proc->region0_pt = (struct pte *)malloc( ks_npg * sizeof(struct pte));
   memcpy((void *)idle_proc->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
 
-  //idle_proc->region1_pt = (struct pte *)malloc( VMEM_1_PAGE_COUNT * sizeof(struct pte));
-  //memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
-  idle_proc->region1_pt = r1_pagetable;
+  idle_proc->region1_pt = (struct pte *)malloc( VMEM_1_PAGE_COUNT * sizeof(struct pte));
+  memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
+  //idle_proc->region1_pt = r1_pagetable;
 
   // flush the TLB region 1 since we changed r1_pagetable
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
@@ -185,13 +185,23 @@ void KernelStart(char *cmd_args[],
     (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
     (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
+  
+    // Make a shadow entry
+    struct pte entry;
+    entry.valid = (u_long) 0x1;
+    entry.prot = (u_long) (PROT_READ | PROT_WRITE);
+    entry.pfn = ((*(init_proc->region0_pt + i)).pfn);
+    r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i] = entry;
   }
   
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
-  unsigned int dest = PMEM_BASE + (((unsigned int) (*(idle_proc->region0_pt)).pfn) * PAGESIZE);
-  unsigned int src = PMEM_BASE + (r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT].pfn * PAGESIZE);
 
+  //unsigned int dest = PMEM_BASE + (((unsigned int) (*(init_proc->region0_pt)).pfn) * PAGESIZE);
+  //unsigned int src = PMEM_BASE + (r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT].pfn * PAGESIZE);
+  unsigned int dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg) << PAGESHIFT;
+  unsigned int src = ((KERNEL_STACK_BASE >> PAGESHIFT) << PAGESHIFT);
   memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
+
    TracePrintf(1, "Starting to load the program in from mem\n");
   //for (i = 0; 
   char *arglist[] = {"init", '\0'};
@@ -291,7 +301,9 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
 
     //((PCB_t *)curr_pcb_p)->kc = kc_in; // Store the kernel context
     memcpy( (void *) &(curr->kc), kc_in, sizeof(KernelContext));
-
+    if (next->kc_set == 0) {
+        memcpy( (void *) &(next->kc), kc_in, sizeof(KernelContext));
+    }
     // Store the current process' kernel stack
     
     // Restore the next_pcb_p's kernel stack
@@ -324,7 +336,7 @@ int perform_context_switch(PCB_t *curr, PCB_t *next) {
     int rc;
 
     // Store current proc's region 0 and 1 pointers
-    curr->region0_pt = &r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT];
+    memcpy((void *)curr->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
     curr->region1_pt = &r1_pagetable[0];
 
     // Put the old process on the ready queue
