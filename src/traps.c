@@ -73,10 +73,13 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
   if (count_items(ready_procs) > 0) {
     PCB_t *next_proc = pop(ready_procs)->data;
 
-    if (perform_context_switch(curr_proc, next_proc) != 0) {
+    if (perform_context_switch(curr_proc, next_proc, uc) != 0) {
       TracePrintf(1, "Context Switch failed\n");
     }
   }
+  
+  TracePrintf(1, ">>> HANDLE_TRAP_CLOCK\n");
+
 } 
 
 /*
