@@ -177,8 +177,12 @@ void KernelStart(char *cmd_args[],
     (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
     (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
+    memcpy((void *)(PMEM_BASE + (*(init_proc->region0_pt + i)).pfn * PAGESIZE),
+            (void *)&(r0_pagetable[i]), PAGESIZE);
   }
 
+  
+  //for (i = 0; 
   char *arglist[] = {"init", '\0'};
   char *progname = "./usr_progs/init";
   //int c_switch_rc = first_context_switch(curr_proc, init_proc, progname, arglist);
