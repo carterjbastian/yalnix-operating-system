@@ -197,11 +197,6 @@ void KernelStart(char *cmd_args[],
   
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
-  //unsigned int dest = PMEM_BASE + (((unsigned int) (*(init_proc->region0_pt)).pfn) * PAGESIZE);
-  //unsigned int src = PMEM_BASE + (r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT].pfn * PAGESIZE);
-  unsigned int dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg) << PAGESHIFT;
-  unsigned int src = ((KERNEL_STACK_BASE >> PAGESHIFT) << PAGESHIFT);
-  memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
 
    TracePrintf(1, "Starting to load the program in from mem\n");
   //for (i = 0; 
@@ -213,6 +208,10 @@ void KernelStart(char *cmd_args[],
 
   
   TracePrintf(1, "Made it to the end of KernelStart\n");
+
+  unsigned int dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg) << PAGESHIFT;
+  unsigned int src = ((KERNEL_STACK_BASE >> PAGESHIFT) << PAGESHIFT);
+  memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
 
 
 
@@ -321,11 +320,13 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     //    r1_pagetable[i] = *(next->region1_pt + i);
     //struct pte **r1_pagetable_pt = &r1_pagetable;
     //r1_pagetable_pt = &(next->region1_pt);
-    WriteRegister(REG_PTBR1, (unsigned int) &(next->region1_pt));
+
     //Restore the next region's kernel stack
     memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
             (void *) next->region0_pt,
             ks_npg * (sizeof(struct pte)));
+
+    WriteRegister(REG_PTBR1, (unsigned int) next->region1_pt);
     // Flush the TLB
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
@@ -338,8 +339,8 @@ int perform_context_switch(PCB_t *curr, PCB_t *next) {
     int rc;
 
     // Store current proc's region 0 and 1 pointers
-    memcpy((void *)curr->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
-    curr->region1_pt = &r1_pagetable[0];
+    //memcpy((void *)curr->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
+    //curr->region1_pt = &r1_pagetable[0];
 
     // Put the old process on the ready queue
     add_to_list(ready_procs, (void *) curr, curr->proc_id);
@@ -350,32 +351,5 @@ int perform_context_switch(PCB_t *curr, PCB_t *next) {
     // Do the switch with magic function
     rc = KernelContextSwitch(MyKCS, (void *) curr, (void *) next);
     TracePrintf(1, "Actually made it out back to perform_context_switch\n");
-    return rc;
-}
-
-int first_context_switch(PCB_t *curr, PCB_t *next, char *fname, char *args[]) {
-    TracePrintf(1, "\t==> first_context_switch\n");
-    int rc;
-
-    // Store current proc's region 0 and 1 pointers
-    curr->region0_pt = &r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT];
-    curr->region1_pt = &r1_pagetable[0];
-
-    // Put the old process on the ready queue
-    add_to_list(ready_procs, (void *) curr, curr->proc_id);
-
-    // Update the current process global variable
-    curr_proc = next;
-
-    // Do the switch with magic function
-    rc = KernelContextSwitch(MyKCS, (void *) curr, (void *) next);
-    if (rc != 0) {
-        TracePrintf(3, "\t!!! KernelContextSwitch Failed\n");
-    } else {
-        rc = LoadProgram(fname, args, next);
-        if (rc == ERROR)
-            TracePrintf(3, "\t!!! LoadProgram Failed\n");
-    }
-    TracePrintf(1, "\t==> first_context_switch complete\n");
     return rc;
 }
