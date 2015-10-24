@@ -21,6 +21,7 @@ void (*interrupt_vector[8]) = {
   HANDLE_TRAP_TTY_TRANSMIT,
   HANDLE_TRAP_DISK
 };
+int ks_npg = KERNEL_STACK_MAXSIZE / PAGESIZE;
 
 /*
 
@@ -144,9 +145,13 @@ void KernelStart(char *cmd_args[],
 
   // Assign the new process' context's stack pointer to the top of the stack
   idle_proc->uc->sp = (void *) (VMEM_1_LIMIT - PAGESIZE);
-
+  
   /* Store pointers to the first page table entries in the PCB instance */
-  idle_proc->region0_pt = &r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT];
+  idle_proc->region0_pt = (struct pte *)malloc( ks_npg * sizeof(struct pte));
+  memcpy((void *)idle_proc->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
+
+  //idle_proc->region1_pt = (struct pte *)malloc( VMEM_1_PAGE_COUNT * sizeof(struct pte));
+  //memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
   idle_proc->region1_pt = r1_pagetable;
 
   // flush the TLB region 1 since we changed r1_pagetable
@@ -180,10 +185,9 @@ void KernelStart(char *cmd_args[],
     (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
     (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
-    TracePrintf(1, "Flushing for i = %d\n", i);
-
   }
-    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+  
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   unsigned int dest = PMEM_BASE + (((unsigned int) (*(idle_proc->region0_pt)).pfn) * PAGESIZE);
   unsigned int src = PMEM_BASE + (r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT].pfn * PAGESIZE);
 
@@ -284,22 +288,30 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     int i, j;
     PCB_t *curr = (PCB_t *) curr_pcb_p;
     PCB_t *next = (PCB_t *) next_pcb_p;
+
     //((PCB_t *)curr_pcb_p)->kc = kc_in; // Store the kernel context
     memcpy( (void *) &(curr->kc), kc_in, sizeof(KernelContext));
 
+    // Store the current process' kernel stack
+    
     // Restore the next_pcb_p's kernel stack
-    for (i = (KERNEL_STACK_BASE >> PAGESHIFT); 
-        i < (DOWN_TO_PAGE(KERNEL_STACK_LIMIT) >> PAGESHIFT);
-            i++) {
-        j = i - (KERNEL_STACK_BASE >> PAGESHIFT);
-        r0_pagetable[i] = *(next->region0_pt + j);
-    }
-
+    //for (i = (KERNEL_STACK_BASE >> PAGESHIFT); 
+    //    i < (DOWN_TO_PAGE(KERNEL_STACK_LIMIT) >> PAGESHIFT);
+    //        i++) {
+    //    j = i - (KERNEL_STACK_BASE >> PAGESHIFT);
+    //    r0_pagetable[i] = *(next->region0_pt + j);
+    //}
+    //Restore the next region's kernel stack
+    memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
+            (void *) next->region0_pt,
+            ks_npg * (sizeof(struct pte)));
 
     // Restore the next proc's region 1 page table
-    for (i = 0; i < VMEM_1_PAGE_COUNT; i++)
-        r1_pagetable[i] = *(next->region1_pt + i);
-   
+    //for (i = 0; i < VMEM_1_PAGE_COUNT; i++)
+    //    r1_pagetable[i] = *(next->region1_pt + i);
+    struct pte **r1_pagetable_pt = &r1_pagetable;
+    r1_pagetable_pt = &(next->region1_pt);
+
     // Flush the TLB
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
