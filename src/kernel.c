@@ -174,7 +174,7 @@ void KernelStart(char *cmd_args[],
     (*(init_proc->region1_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
   }
   for (i = 0; i < KERNEL_STACK_MAXSIZE / PAGESIZE; i++) {
-    (*(init_proc->region0_pt + i)).valid = (u_long) 0x0;
+    (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
     (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
   }
