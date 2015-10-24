@@ -332,9 +332,11 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
 }
 
 
-int perform_context_switch(PCB_t *curr, PCB_t *next) {
+int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
     int rc;
-
+    
+    curr->uc = uc;
+    
     // Store current proc's region 0 and 1 pointers
     memcpy((void *)curr->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
     curr->region1_pt = &r1_pagetable[0];
