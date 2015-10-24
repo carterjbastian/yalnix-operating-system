@@ -20,23 +20,28 @@
 #make all will make all the kernel objects and user objects
 ALL = $(KERNEL_ALL) $(USER_APPS)
 KERNEL_ALL = yalnix
-SRCDIR = /media/sf_yalnix/src
-#SRCDIR = /media/sf_ringo/src# I use this one b/c I named my folder differently
+#SRCDIR = /media/sf_yalnix/src
+SRCDIR = /media/sf_ringo/src# I use this one b/c I named my folder differently
+USRDIR = /media/sf_ringo/usr_progs
 
 #List all kernel source files here.  
-KERNEL_SRCS = $(SRCDIR)/kernel.c $(SRCDIR)/PCB.c $(SRCDIR)/linked_list.c $(SRCDIR)/traps.c
+KERNEL_SRCS = $(SRCDIR)/kernel.c $(SRCDIR)/PCB.c $(SRCDIR)/linked_list.c $(SRCDIR)/traps.c $(SRCDIR)/load_program.c
 #List the objects to be formed form the kernel source files here.  Should be the same as the prvious list, replacing ".c" with ".o" 
-KERNEL_OBJS = $(SRCDIR)/kernel.o $(SRCDIR)/PCB.o $(SRCDIR)/linked_list.o $(SRCDIR)/traps.o
+KERNEL_OBJS = $(SRCDIR)/kernel.o $(SRCDIR)/PCB.o $(SRCDIR)/linked_list.o $(SRCDIR)/traps.o $(SRCDIR)/load_program.o
 #List all of the header files necessary for your kernel
-KERNEL_INCS = $(SRCDIR)/kernel.h $(SRCDIR)/PCB.h $(SRCDIR)/linked_list.h $(SRCDIR)/traps.h
+KERNEL_INCS = $(SRCDIR)/kernel.h $(SRCDIR)/PCB.h $(SRCDIR)/linked_list.h $(SRCDIR)/traps.h 
 
+U_OBJ_DIR = $(USRDIR)/objs
 
 #List all user programs here.
-USER_APPS = 
+USER_APPS = $(USRDIR)/init
+
 #List all user program source files here.  SHould be the same as the previous list, with ".c" added to each file
-USER_SRCS = 
+USER_SRCS = $(USRDIR)/init.c
+
 #List the objects to be formed form the user  source files here.  Should be the same as the prvious list, replacing ".c" with ".o"
-USER_OBJS = 
+USER_OBJS = $(USRDIR)/init.o
+
 #List all of the header files necessary for your user programs
 USER_INCS = 
 

@@ -31,6 +31,7 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
 // ==>> of this structure used to hold the cpu context 
 // ==>> for the process holding the new program.  
 {
+  TracePrintf(1, "\t==> LoadProgram\n");
   int fd;
   int (*entry)();
   struct load_info li;
@@ -47,7 +48,27 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
   long segment_size;
   char *argbuf;
 
-  
+
+  /*
+   * Set up the page tables for the process so that we can read the
+   * program into memory.  Get the right number of physical pages
+   * allocated, and set them all to writable.
+   */
+  // Since we'll be messing with page tables
+  struct pte proc_pagetable[VMEM_1_PAGE_COUNT];
+  struct pte **proc_pagetable_pt = &proc_pagetable;
+  proc_pagetable_pt = &(proc->region1_pt);
+
+
+  /*
+   * Briefly modify the Page Tables so that we can write to the new process'
+   * region 1
+   */  
+  // Save the current base pointer for afterward
+  unsigned int old_proc_PTBR1 = ReadRegister(REG_PTBR1); 
+  WriteRegister(REG_PTBR1, (unsigned int) proc_pagetable);
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+
   /*
    * Open the executable file 
    */
@@ -157,12 +178,6 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
     cp2 += strlen(cp2) + 1;
   }
 
-  /*
-   * Set up the page tables for the process so that we can read the
-   * program into memory.  Get the right number of physical pages
-   * allocated, and set them all to writable.
-   */
-
 // ==>> Throw away the old region 1 virtual address space of the
 // ==>> curent process by freeing
 // ==>> all physical pages currently mapped to region 1, and setting all 
@@ -174,57 +189,70 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
 // ==>> how many pages the new process needs and allocate or
 // ==>> deallocate a few pages to fit the size of memory to the requirements
 // ==>> of the new process.
-  pte *rg1_pt = ReadRegister(REG_PTBR1);
+
+  /*struct pte *rg1_pt = ReadRegister(REG_PTBR1);
   int rg1_size = (int) ReadRegister(REG_PTLR1);
+  
   for (; rg1_pt < rg1_pt + rg1_size; rg1_pt++) { 
-    rg1_pt->
-  } 
+    rg1_pt->valid = (u_long) 0x0;
+    if (rg1_pt0->pfn != NULL)
+      add_to_list(&FrameList, (void *) NULL, (rg1_pt->pfn >> PAGESHIFT));
+  } */
 
 
 // ==>> Allocate "li.t_npg" physical pages and map them starting at
 // ==>> the "text_pg1" page in region 1 address space.  
 // ==>> These pages should be marked valid, with a protection of 
 // ==>> (PROT_READ | PROT_WRITE)
+  TracePrintf(3, "\tLoadProgram: Allocating pages for text\n");
   for (i = text_pg1; i < text_pg1 + li.t_npg; i++) {
-    pte *entry = available_frames.pop();
+    struct pte entry;
     entry.valid = (u_long) 0x1;
     entry.prot = (u_long) (PROT_READ | PROT_WRITE);
+    entry.pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
+    proc_pagetable[i] = entry;
   }
 
 // ==>> Allocate "data_npg" physical pages and map them starting at
 // ==>> the  "data_pg1" in region 1 address space.  
 // ==>> These pages should be marked valid, with a protection of 
 // ==>> (PROT_READ | PROT_WRITE).
+  TracePrintf(3, "\tLoadProgram: Allocating pages for data\n");
   for (i = data_pg1; i < data_pg1 + data_npg; i++) {
     struct pte entry;
     entry.valid = (u_long) 0x1;
     entry.prot = (u_long) (PROT_READ | PROT_WRITE);
-    entry.pfn = (u_long) ((PMEM_BASE + (i * PAGESIZE)) >> PAGESHIFT);
-    // do something with entry
+    entry.pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
+    proc_pagetable[i] = entry;
   }
 
   /*
    * Allocate memory for the user stack too.
    */
+
 // ==>> Allocate "stack_npg" physical pages and map them to the top
 // ==>> of the region 1 virtual address space.
 // ==>> These pages should be marked valid, with a
 // ==>> protection of (PROT_READ | PROT_WRITE).
-  for (i = VMEM_LIMIT - stack_npg; i < VMEN_LIMIT; i++) {
+  TracePrintf(3, "\tLoadProgram: Allocating pages for stack\n"); 
+  for (i = (VMEM_1_PAGE_COUNT - stack_npg); i < VMEM_1_PAGE_COUNT; i++) {
     struct pte entry;
     entry.valid = (u_long) 0x1;
     entry.prot = (u_long) (PROT_READ | PROT_WRITE);
-    entry.pfn = (u_long) ((PMEM_BASE + (i * PAGESIZE)) >> PAGESHIFT);
-    // do something with entry
+    entry.pfn = (u_long) (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
+    proc_pagetable[i] = entry;
   }
+
 
   /*
    * All pages for the new address space are now in the page table.  
    * But they are not yet in the TLB, remember!
    */
+
   /*
    * Read the text from the file into memory.
    */
+  TracePrintf(3, "\tLoadProgram: Reading Text\n");
   lseek(fd, li.t_faddr, SEEK_SET);
   segment_size = li.t_npg << PAGESHIFT;
   if (read(fd, (void *) li.t_vaddr, segment_size) != segment_size) {
@@ -237,6 +265,7 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
   /*
    * Read the data from the file into memory.
    */
+  TracePrintf(3, "\tLoadProgram: Reading Data\n");
   lseek(fd, li.id_faddr, 0);
   segment_size = li.id_npg << PAGESHIFT;
 
@@ -259,14 +288,17 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
 // ==>> invalidate their entries in the TLB or write the updated entries
 // ==>> into the TLB.  It's nice for the TLB and the page tables to remain
 // ==>> consistent.
-  for (i = VMEM_1_BASE + (text_pg1 << PAGESHIFT); i < VMEN_LIMIT; i++) {
-    struct pte entry = list.find_by_id(i);
-    entry.prot = (u_long) (PROT_READ | PROT_EXEC);
-    WriteRegister(REG_TLB_FLUSH, i);
+
+
+  for (i = text_pg1; i < text_pg1 + li.t_npg; i++) {
+      proc_pagetable[i].prot = (u_long) (PROT_READ | PROT_EXEC);
   }
 
-
-
+  //  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
+  // Having worked with the page tables, copy it into the allocated location
+  // at which this process' r1 page table is stored
+  TracePrintf(3, "\tLoadProgram: Copying page table to proc's pointer\n");
+  memcpy(proc->region1_pt, proc_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
   close(fd);			/* we've read it all now */
 
   /*
@@ -279,14 +311,15 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
    */
 // ==>> Here you should put your data structure (PCB or process)
 // ==>>  proc->context.pc = (caddr_t) li.entry;
-  proc-context.pc = (caddr_t) li.entry;
+  proc->uc->pc = (caddr_t) li.entry;
 
   /*
    * Now, finally, build the argument list on the new stack.
    */
-
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
 #ifdef LINUX
   memset(cpp, 0x00, VMEM_1_LIMIT - ((int) cpp));
+  TracePrintf(1,"Past the memset\n");
 #endif
 
 
@@ -303,6 +336,15 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
   *cpp++ = NULL;			/* the last argv is a NULL pointer */
   *cpp++ = NULL;			/* a NULL pointer for an empty envp */
 
+
+  // Add a pointer to the base page number of the heap in the process
+  proc->heap_base_page = text_pg1 + li.t_npg;
+
+  // Restore old PTBR1
+  WriteRegister(REG_PTBR1, old_proc_PTBR1);
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+
+  TracePrintf(1, "Finished Loading in Program\n");
   return SUCCESS;
 }
 

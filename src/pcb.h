@@ -16,6 +16,7 @@ typedef struct PCB_t {
   List *children;
   List *exited_children;
   int *delay_clock_ticks;
+  int heap_base_page;
 } PCB_t;
   
 /*

@@ -54,20 +54,23 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
   // cpu quantum per process of 1 clock tick
   
   int i;
-  ListNode *iterator = blocked_procs->first;
+  if (count_items(blocked_procs) > 0) {
+      ListNode *iterator = blocked_procs->first;
 
 
-  for (i = 0; i < count_items(blocked_procs); i++) { 
-    PCB_t *proc = iterator->data;
-    proc->delay_clock_ticks -= 1;
-    if (proc->delay_clock_ticks <= 0) { 
-      add_to_list(ready_procs, proc, proc->proc_id);
-    }
-   iterator = iterator->next; 
-  } 
+    for (i = 0; i < count_items(blocked_procs); i++) { 
+        PCB_t *proc = iterator->data;
+        proc->delay_clock_ticks -= 1;
+        
+        if (proc->delay_clock_ticks <= 0) { 
+            add_to_list(ready_procs, proc, proc->proc_id);
+        }
+        iterator = iterator->next; 
+    } 
+  }
 
   // Are there more processes waiting?
-  if (count_items(ready_procs) > 0) { 
+  if (count_items(ready_procs) > 0) {
     PCB_t *next_proc = pop(ready_procs)->data;
 
     if (perform_context_switch(curr_proc, next_proc) != 0) {

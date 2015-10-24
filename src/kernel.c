@@ -7,6 +7,9 @@
 #include "traps.h"
 #include "PCB.h"
 
+// Private Function Declarations
+int first_context_switch(PCB_t *curr, PCB_t *next, char *fname, char *args[]);
+
 // Statically declared interrupt_vector
 void (*interrupt_vector[8]) = {
   HANDLE_TRAP_KERNEL, 
@@ -18,16 +21,6 @@ void (*interrupt_vector[8]) = {
   HANDLE_TRAP_TTY_TRANSMIT,
   HANDLE_TRAP_DISK
 };
-
-// Statically declared frame table list
-List FrameList;
-
-// Statically declared list of Processes
-List ProcessList;
-
-// Statically declared page table arrays
-struct pte r0_pagetable[VMEM_0_PAGE_COUNT];
-struct pte r1_pagetable[VMEM_1_PAGE_COUNT];
 
 /*
 
@@ -71,6 +64,12 @@ void KernelStart(char *cmd_args[],
   pframes_in_use = UP_TO_PAGE(kernel_brk) >> PAGESHIFT;
   int base_frame_r1 = DOWN_TO_PAGE(VMEM_1_BASE) >> PAGESHIFT;
   int top_frame_r1 = UP_TO_PAGE(VMEM_1_LIMIT) >> PAGESHIFT;
+
+  // Allocate kernel heap space for the Kernel's linked lists / queues
+  ready_procs = (List *)malloc( sizeof(List) );
+  blocked_procs = (List *)malloc( sizeof(List) );
+  all_procs = (List *)malloc( sizeof(List) ); 
+  dead_procs = (List *)malloc( sizeof(List) ); 
 
   // Create the list of empty frames (storing the frame number as
   // the Node's ID)
@@ -126,7 +125,6 @@ void KernelStart(char *cmd_args[],
 
   /* create idle process (see PCB.c) */
   PCB_t *idle_proc = new_process(uctxt); // Allocates internally
-  add_to_list(&ProcessList, (void *)idle_proc, 0);    // update processes list with idle process
 
   /* Change the pc and sp of the new process' UserContext */
   idle_proc->uc->pc = &DoIdle; // pc points to idle function
@@ -155,7 +153,41 @@ void KernelStart(char *cmd_args[],
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
 
   /* Internal Book Keeping with new process */ 
-  curr_proc = idle_proc;                        // Track the current process running
+  add_to_list(all_procs, (void *)idle_proc, idle_proc->proc_id);    // update processes list with idle process
+  curr_proc = idle_proc;
+
+  TracePrintf(1, "Starting to load the program in from mem\n");
+
+  // Make the init process
+  PCB_t *init_proc = new_process(idle_proc->uc);
+  add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
+  add_to_list(all_procs, (void *)init_proc, init_proc->proc_id);
+
+  // Allocate space for init's Kernel Stack and Region 1 ptes
+  init_proc->region0_pt = (struct pte *)malloc((KERNEL_STACK_MAXSIZE / PAGESIZE)  * sizeof(struct pte));
+  init_proc->region1_pt = (struct pte *)malloc(VMEM_1_PAGE_COUNT * sizeof(struct pte));
+
+  // Initialize this memory space
+  for (i = 0; i < VMEM_1_PAGE_COUNT; i++) {
+    
+    (*(init_proc->region1_pt + i)).valid = (u_long) 0x0;
+    (*(init_proc->region1_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
+  }
+  for (i = 0; i < KERNEL_STACK_MAXSIZE / PAGESIZE; i++) {
+    (*(init_proc->region0_pt + i)).valid = (u_long) 0x0;
+    (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
+    (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
+  }
+
+  char *arglist[] = {"init", '\0'};
+  char *progname = "./usr_progs/init";
+  //int c_switch_rc = first_context_switch(curr_proc, init_proc, progname, arglist);
+  
+  int lp_rc = LoadProgram(progname, arglist, init_proc);
+
+  
+  TracePrintf(1, "Made it to the end of KernelStart\n");
+
 
 
   /* 
@@ -164,7 +196,6 @@ void KernelStart(char *cmd_args[],
    */
   memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
 
-  TracePrintf(1, "Made it to the end of KernelStart\n");
 } 
 
 // idle function for testing
@@ -238,17 +269,21 @@ int SetKernelBrk(void * addr) {
 
 
 KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
+    TracePrintf(1, "\t==> MyKCS\n");
     int i, j;
     PCB_t *curr = (PCB_t *) curr_pcb_p;
     PCB_t *next = (PCB_t *) next_pcb_p;
-    curr->kc = kc_in; // Store the kernel context
+    ((PCB_t *)curr_pcb_p)->kc = kc_in; // Store the kernel context
     
 
     // Restore the next_pcb_p's kernel stack
-    for (i = (KERNEL_STACK_BASE >> PAGESHIFT); i < (VMEM_0_PAGE_COUNT); i++) {
+    for (i = (KERNEL_STACK_BASE >> PAGESHIFT); 
+        i < (DOWN_TO_PAGE(KERNEL_STACK_LIMIT) >> PAGESHIFT);
+            i++) {
         j = i - (KERNEL_STACK_BASE >> PAGESHIFT);
         r0_pagetable[i] = *(next->region0_pt + j);
     }
+
 
     // Restore the next proc's region 1 page table
     for (i = 0; i < VMEM_1_PAGE_COUNT; i++)
@@ -257,7 +292,7 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     // Flush the TLB
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
-
+    TracePrintf(1, "\t==> MyKCS done\n");
     return next->kc;
 }
 
@@ -278,5 +313,32 @@ int perform_context_switch(PCB_t *curr, PCB_t *next) {
     // Do the switch with magic function
     rc = KernelContextSwitch(MyKCS, (void *) curr, (void *) next);
 
+    return rc;
+}
+
+int first_context_switch(PCB_t *curr, PCB_t *next, char *fname, char *args[]) {
+    TracePrintf(1, "\t==> first_context_switch\n");
+    int rc;
+
+    // Store current proc's region 0 and 1 pointers
+    curr->region0_pt = &r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT];
+    curr->region1_pt = &r1_pagetable[0];
+
+    // Put the old process on the ready queue
+    add_to_list(ready_procs, (void *) curr, curr->proc_id);
+
+    // Update the current process global variable
+    curr_proc = next;
+
+    // Do the switch with magic function
+    rc = KernelContextSwitch(MyKCS, (void *) curr, (void *) next);
+    if (rc != 0) {
+        TracePrintf(3, "\t!!! KernelContextSwitch Failed\n");
+    } else {
+        rc = LoadProgram(fname, args, next);
+        if (rc == ERROR)
+            TracePrintf(3, "\t!!! LoadProgram Failed\n");
+    }
+    TracePrintf(1, "\t==> first_context_switch complete\n");
     return rc;
 }
