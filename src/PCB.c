@@ -28,6 +28,5 @@ PCB_t *new_process(UserContext *uc) {
   available_process_id++;
 
   // Default value for kc
-  pcb->kc = (KernelContext *)malloc( sizeof(KernelContext) );
   return pcb;
 }

@@ -284,8 +284,8 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     int i, j;
     PCB_t *curr = (PCB_t *) curr_pcb_p;
     PCB_t *next = (PCB_t *) next_pcb_p;
-    ((PCB_t *)curr_pcb_p)->kc = kc_in; // Store the kernel context
-    
+    //((PCB_t *)curr_pcb_p)->kc = kc_in; // Store the kernel context
+    memcpy( (void *) &(curr->kc), kc_in, sizeof(KernelContext));
 
     // Restore the next_pcb_p's kernel stack
     for (i = (KERNEL_STACK_BASE >> PAGESHIFT); 
@@ -304,7 +304,7 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
     TracePrintf(1, "\t==> MyKCS done\n");
-    return next->kc;
+    return &next->kc;
 }
 
 
