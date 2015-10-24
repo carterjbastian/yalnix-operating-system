@@ -59,6 +59,7 @@ void KernelStart(char *cmd_args[],
   WriteRegister(REG_VECTOR_BASE, (unsigned int) &interrupt_vector);
   TracePrintf(1, "Wrote the interrupt vector\n");
 
+  //r1_pagetable = (struct pte *)malloc(VMEM_1_PAGE_COUNT * sizeof(struct pte));
   // Set up Frame-related variables
   total_pframes = pmem_size / PAGESIZE;
   pframes_in_kernel = (VMEM_0_LIMIT >> PAGESHIFT);
@@ -313,17 +314,18 @@ KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     //    j = i - (KERNEL_STACK_BASE >> PAGESHIFT);
     //    r0_pagetable[i] = *(next->region0_pt + j);
     //}
-    //Restore the next region's kernel stack
-    memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
-            (void *) next->region0_pt,
-            ks_npg * (sizeof(struct pte)));
+
 
     // Restore the next proc's region 1 page table
     //for (i = 0; i < VMEM_1_PAGE_COUNT; i++)
     //    r1_pagetable[i] = *(next->region1_pt + i);
-    struct pte **r1_pagetable_pt = &r1_pagetable;
-    r1_pagetable_pt = &(next->region1_pt);
-
+    //struct pte **r1_pagetable_pt = &r1_pagetable;
+    //r1_pagetable_pt = &(next->region1_pt);
+    WriteRegister(REG_PTBR1, (unsigned int) &(next->region1_pt));
+    //Restore the next region's kernel stack
+    memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
+            (void *) next->region0_pt,
+            ks_npg * (sizeof(struct pte)));
     // Flush the TLB
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
@@ -347,7 +349,7 @@ int perform_context_switch(PCB_t *curr, PCB_t *next) {
 
     // Do the switch with magic function
     rc = KernelContextSwitch(MyKCS, (void *) curr, (void *) next);
-
+    TracePrintf(1, "Actually made it out back to perform_context_switch\n");
     return rc;
 }
 
