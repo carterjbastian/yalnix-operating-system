@@ -239,7 +239,7 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
     struct pte entry;
     entry.valid = (u_long) 0x1;
     entry.prot = (u_long) (PROT_READ | PROT_WRITE);
-    entry.pfn = (u_long) (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
+    entry.pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
     proc_pagetable[i] = entry;
   }
 
