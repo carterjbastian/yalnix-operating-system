@@ -11,6 +11,7 @@ typedef struct PCB_t {
   unsigned int proc_id;
   UserContext *uc; 
   KernelContext kc;
+  int kc_set;
   struct pte *region0_pt;
   struct pte *region1_pt;
   List *children;
