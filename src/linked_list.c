@@ -7,7 +7,9 @@ void add_to_list(List *list, void *data, int id) {
   ListNode *new = malloc( sizeof(ListNode) );
   new->data = data;
   new->id = id;
-    
+  new->prev = NULL;
+  new->next = NULL;
+
   ListNode *node = list->first;
   if (!node) { 
     list->first = new;
@@ -56,7 +58,9 @@ ListNode* pop(List *list) {
 
 int count_items(List *list) { 
   int count = 0;
+
   ListNode *node = list->first;
+
   while (node) { 
     count++;
     node = node->next;
@@ -68,7 +72,7 @@ int count_items(List *list) {
 
 ListNode* find_by_id(List *list, int id) { 
   ListNode *node = list->first;
-  while(node) { 
+  while(node) {
     if (node->id == id) { 
       return node;
     } 

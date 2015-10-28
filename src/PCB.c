@@ -22,7 +22,6 @@ PCB_t *new_process(UserContext *uc) {
   // UserContext inherits the vector and code from 
   pcb->uc->vector = uc->vector;
   pcb->uc->code = uc->code;
-  pcb->kc_set = 0;
   // Give it a new process ID
   pcb->proc_id = available_process_id; 
   available_process_id++;

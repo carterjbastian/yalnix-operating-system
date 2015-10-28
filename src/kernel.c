@@ -147,6 +147,8 @@ void KernelStart(char *cmd_args[],
   // Assign the new process' context's stack pointer to the top of the stack
   idle_proc->uc->sp = (void *) (VMEM_1_LIMIT - PAGESIZE);
   
+  // Allocate space for the KernelContext (in the idle proc)
+  idle_proc->kc_p = (KernelContext *)malloc( sizeof(KernelContext) );
   /* Store pointers to the first page table entries in the PCB instance */
   idle_proc->region0_pt = (struct pte *)malloc( ks_npg * sizeof(struct pte));
   memcpy((void *)idle_proc->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
@@ -154,6 +156,7 @@ void KernelStart(char *cmd_args[],
   idle_proc->region1_pt = (struct pte *)malloc( VMEM_1_PAGE_COUNT * sizeof(struct pte));
   memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
   //idle_proc->region1_pt = r1_pagetable;
+  
 
   // flush the TLB region 1 since we changed r1_pagetable
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
@@ -165,8 +168,7 @@ void KernelStart(char *cmd_args[],
 
   // Make the init process
   PCB_t *init_proc = new_process(idle_proc->uc);
-  add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
-  add_to_list(all_procs, (void *)init_proc, init_proc->proc_id);
+
 
   // Allocate space for init's Kernel Stack and Region 1 ptes
   init_proc->region0_pt = (struct pte *)malloc((KERNEL_STACK_MAXSIZE / PAGESIZE)  * sizeof(struct pte));
@@ -185,33 +187,22 @@ void KernelStart(char *cmd_args[],
   for (i = 0; i < KERNEL_STACK_MAXSIZE / PAGESIZE; i++) {
     (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
-    (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);
-  
-    // Make a shadow entry
-    struct pte entry;
-    entry.valid = (u_long) 0x1;
-    entry.prot = (u_long) (PROT_READ | PROT_WRITE);
-    entry.pfn = ((*(init_proc->region0_pt + i)).pfn);
-    r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i] = entry;
+    (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);  
   }
   
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+  // Clone the KernelContext and KernelStack for idle proc into init proc
+  int rc = KernelContextSwitch(MyKCSClone, (void *) idle_proc, (void *) init_proc);
+  TracePrintf(1, "KernelContextSwitch returned with code %d\n", rc);
 
-
-   TracePrintf(1, "Starting to load the program in from mem\n");
+  TracePrintf(1, "Starting to load the program in from mem\n");
   char *arglist[] = {"init", '\0'};
   char *progname = "./usr_progs/init";
   
   int lp_rc = LoadProgram(progname, arglist, init_proc);
-
-  
-  TracePrintf(1, "Made it to the end of KernelStart\n");
-
-  unsigned int dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg) << PAGESHIFT;
-  unsigned int src = KERNEL_STACK_BASE;
-  memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
-
-
+  TracePrintf(1, "LoadProgram returned with code %d\n", lp_rc);
+  add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
+  add_to_list(all_procs, (void *)init_proc, init_proc->proc_id);
 
   /* 
    * Copy the newly created idle process' UserContext into the current
@@ -219,7 +210,106 @@ void KernelStart(char *cmd_args[],
    */
   memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
 
+  TracePrintf(1, "Made it to the end of KernelStart\n");
+
 } 
+
+KernelContext *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
+    TracePrintf(1, "\t==> MyKCSClone\n");
+    PCB_t *curr = (PCB_t *) curr_pcb_p;
+    PCB_t *next = (PCB_t *) next_pcb_p;
+    // Copy the kc passed in to the PBC of the new proc
+    memcpy( (void *) (next->kc_p), (void *)kc_in, sizeof(KernelContext) );
+    TracePrintf(1, "Copied the KC into the new proc\n"); 
+
+    int i;
+    u_long old_pfns[ks_npg];
+    unsigned int dest;
+    unsigned int src;
+
+    // Temporarily map the kernel stack into frames in the current 
+    for (i = 0; i < ks_npg; i++) {
+        old_pfns[i] = r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].pfn;
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].valid = (u_long) 0x1;
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].pfn = ((*(next->region0_pt + i)).pfn);
+    }
+    TracePrintf(1, "Temporarily mapped kstack frames into current mapping\n");
+    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+    TracePrintf(1, "Flushed the TLB\n");
+
+    // Copy the contents of the current kernel stack into the new kernel stack
+    dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg) << PAGESHIFT;
+    src = KERNEL_STACK_BASE;
+    memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
+    TracePrintf(1, "Copied the kstack contents\n");
+
+    // Restore the old kernel page mappings
+    for (i = 0; i < ks_npg; i++) {
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].pfn = old_pfns[i];
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].prot = (u_long)0x0;
+    }
+    TracePrintf(1, "Restored old kernel page mappings\n");
+    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+
+    TracePrintf(1, "\t==> MyKCSClone done\n");
+    return next->kc_p;
+}
+
+KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
+    TracePrintf(1, "\t==> MyKCSSwitch\n");
+    int i, j;
+    PCB_t *curr = (PCB_t *) curr_pcb_p;
+    PCB_t *next = (PCB_t *) next_pcb_p;
+
+    // Copy the kernel context to save it
+    memcpy( (void *) (curr->kc_p), (void *)kc_in, sizeof(KernelContext));
+    TracePrintf(1, "Copied Kernel Context\n"); 
+
+    // Store the current region's kernel stack with a memcpy
+    memcpy((void *) curr->region0_pt,
+            (void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
+            ks_npg * (sizeof(struct pte)));
+
+    TracePrintf(1, "Stored current procs kernel stack\n");
+    //Restore the next region's kernel stack
+    memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
+            (void *) next->region0_pt,
+            ks_npg * (sizeof(struct pte)));
+    TracePrintf(1, "Restored next procs kernel stack\n");
+    // Restore the next region's Region 1 by setting the pointer to the
+    // page table
+    WriteRegister(REG_PTBR1, (unsigned int) next->region1_pt);
+    TracePrintf(1, "Restored next procs r1\n");
+    // Flush the TLB
+    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+
+    TracePrintf(1, "\t==> MyKCSSwitch done\n");
+    return next->kc_p;
+}
+
+
+int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
+    TracePrintf(1, "\t===> perform_context_switch\n");
+    int rc;
+    
+    memcpy((void *)curr->uc, (void *) uc, sizeof(UserContext) );
+    
+    // Store current proc's region 0 and 1 pointers
+    curr->region1_pt = &r1_pagetable[0];
+
+    // Put the old process on the ready queue
+    add_to_list(ready_procs, (void *) curr, curr->proc_id);
+
+    // Update the current process global variable
+    curr_proc = next;
+    memcpy((void *) uc, (void *) next->uc, sizeof(UserContext) );
+
+    // Do the switch with magic function
+    rc = KernelContextSwitch(MyKCSSwitch, (void *) curr, (void *) next);
+    TracePrintf(1, "Actually made it out back to perform_context_switch\n");
+    TracePrintf(1, "\t===> perform_context_switch done\n");
+    return rc;
+}
 
 // idle function for testing
 void DoIdle() {
@@ -291,53 +381,3 @@ int SetKernelBrk(void * addr) {
   }
 }
 
-
-KernelContext *MyKCS(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
-    TracePrintf(1, "\t==> MyKCS\n");
-    int i, j;
-    PCB_t *curr = (PCB_t *) curr_pcb_p;
-    PCB_t *next = (PCB_t *) next_pcb_p;
-
-    // Copy the kernel context
-    memcpy( (void *) (curr->kc_p), (void *)kc_in, sizeof(KernelContext));
-    curr->kc_set = 1;
-    if (next->kc_set == 0) {
-        memcpy( (void *) (next->kc_p), (void *)kc_in, sizeof(KernelContext));
-        next->kc_set = 1;
-    }
-    
-    //Restore the next region's kernel stack
-    memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
-            (void *) next->region0_pt,
-            ks_npg * (sizeof(struct pte)));
-
-    WriteRegister(REG_PTBR1, (unsigned int) next->region1_pt);
-
-    // Flush the TLB
-    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
-
-    TracePrintf(1, "\t==> MyKCS done\n");
-    return next->kc_p;
-}
-
-
-int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
-    int rc;
-    
-    curr->uc = uc;
-    
-    // Store current proc's region 0 and 1 pointers
-    memcpy((void *)curr->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
-    curr->region1_pt = &r1_pagetable[0];
-
-    // Put the old process on the ready queue
-    add_to_list(ready_procs, (void *) curr, curr->proc_id);
-
-    // Update the current process global variable
-    curr_proc = next;
-
-    // Do the switch with magic function
-    rc = KernelContextSwitch(MyKCS, (void *) curr, (void *) next);
-    TracePrintf(1, "Actually made it out back to perform_context_switch\n");
-    return rc;
-}
