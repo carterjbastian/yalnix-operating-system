@@ -191,13 +191,11 @@ void KernelStart(char *cmd_args[],
   }
   
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
-  // Clone the KernelContext and KernelStack for idle proc into init proc
-  int rc = KernelContextSwitch(MyKCSClone, (void *) idle_proc, (void *) init_proc);
-  TracePrintf(1, "KernelContextSwitch returned with code %d\n", rc);
-
+  
   TracePrintf(1, "Starting to load the program in from mem\n");
   char *arglist[] = {"init", '\0'};
   char *progname = "./usr_progs/init";
+  
   
   int lp_rc = LoadProgram(progname, arglist, init_proc);
   TracePrintf(1, "LoadProgram returned with code %d\n", lp_rc);
@@ -210,8 +208,10 @@ void KernelStart(char *cmd_args[],
    */
   memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
 
-  TracePrintf(1, "Made it to the end of KernelStart\n");
+  // Clone the KernelContext and KernelStack for idle proc into init proc
+  int rc = KernelContextSwitch(MyKCSClone, (void *) idle_proc, (void *) init_proc);
 
+  TracePrintf(1, "Made it to the end of KernelStart\n");
 } 
 
 KernelContext *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
@@ -306,6 +306,9 @@ int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
 
     // Do the switch with magic function
     rc = KernelContextSwitch(MyKCSSwitch, (void *) curr, (void *) next);
+
+    memcpy((void *)uc, (void *) curr->uc, sizeof(UserContext) );
+
     TracePrintf(1, "Actually made it out back to perform_context_switch\n");
     TracePrintf(1, "\t===> perform_context_switch done\n");
     return rc;
