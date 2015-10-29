@@ -288,25 +288,37 @@ KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pc
 }
 
 
+// IMPT: assumes ready_procs.count > 0
+int switch_to_next_available_proc(UserContext *uc, int should_run_again){ 
+
+  // Put the old process on the ready queue if needed
+  if (should_run_again) { 
+    add_to_list(ready_procs, (void *) curr_proc, curr_proc->proc_id);
+  } 
+  
+  PCB_t *next_proc = pop(ready_procs)->data;
+  if (perform_context_switch(curr_proc, next_proc, uc) != 0) {
+    TracePrintf(1, "Context Switch failed\n");
+  }
+  
+} 
+
 int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
     TracePrintf(1, "\t===> perform_context_switch\n");
     int rc;
-    
-    memcpy((void *)curr->uc, (void *) uc, sizeof(UserContext) );
+      
+    memcpy((void *)curr->uc, (void *) uc, sizeof(UserContext) );      
     
     // Store current proc's region 0 and 1 pointers
     curr->region1_pt = &r1_pagetable[0];
-
-    // Put the old process on the ready queue
-    add_to_list(ready_procs, (void *) curr, curr->proc_id);
-
+      
     // Update the current process global variable
     curr_proc = next;
     memcpy((void *) uc, (void *) next->uc, sizeof(UserContext) );
 
     // Do the switch with magic function
     rc = KernelContextSwitch(MyKCSSwitch, (void *) curr, (void *) next);
-
+        
     memcpy((void *)uc, (void *) curr->uc, sizeof(UserContext) );
 
     TracePrintf(1, "Actually made it out back to perform_context_switch\n");
