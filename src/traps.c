@@ -127,6 +127,7 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
   unsigned int usr_heap_base = curr_proc->heap_base_page;
   struct pte *temp_ent;
   int i;
+
   /* Check if the requested address would interfere with the heap */
   if (addr_pg - usr_brk_pg <= 2) {
       TracePrintf(3, "\tProcess %d does not have enough memory to grow the stack\n",
@@ -135,7 +136,7 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
   }
 
   /* Loop through each page in virtuall memory and allocate a physical frame */
-  for (i = addr_pg; i <= top_stack_pg; i++) {
+  for (i = addr_pg - 128; i <= top_stack_pg - 128; i++) {
       temp_ent = (curr_proc->region1_pt + i);
 
       // If there's no page allocated for this
