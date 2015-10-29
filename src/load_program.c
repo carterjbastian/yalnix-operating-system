@@ -145,6 +145,7 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
  TracePrintf(1, "LoadProgram: heap_size %d, stack_size %d\n",
 	      li.t_npg + data_npg, stack_npg);
 
+  proc->brk_addr = (data_pg1 + li.t_npg + data_npg) << PAGESHIFT;
 
   /* leave at least one page between heap and stack */
   if (stack_npg + data_pg1 + data_npg >= MAX_PT_LEN) {

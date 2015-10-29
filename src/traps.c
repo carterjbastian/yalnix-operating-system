@@ -106,12 +106,56 @@ user process.
 
 */
 void HANDLE_TRAP_MEMORY(UserContext *uc) { 
+  TracePrintf(1, "HANDLE_TRAP_MEMORY: addr %p\n", uc->addr);
+
+  // Check if this is a permissions error
+  if (uc->code == YALNIX_ACCERR) {
+      TracePrintf(3, "\tProcess %d had a permissions error at addr %p\n",
+              curr_proc->proc_id, uc->code);
+      exit(-1);
+  }
+
+  // Otherwise, it's an access error
   
-  TracePrintf(1, "HANDLE_TRAP_MEMORY\n");
+  /* Get the values of pages to loop through */
+  unsigned int addr_pg = DOWN_TO_PAGE(uc->addr) >> PAGESHIFT;
+  unsigned int top_stack_pg = VMEM_1_LIMIT >> PAGESHIFT;
+  unsigned int usr_brk_pg = UP_TO_PAGE(curr_proc->brk_addr) >> PAGESHIFT;
+  unsigned int usr_heap_base = curr_proc->heap_base_page;
+  struct pte *temp_ent;
+  int i;
+  /* Check if the requested address would interfere with the heap */
+  if (addr_pg - usr_brk_pg <= 2) {
+      TracePrintf(3, "\tProcess %d does not have enough memory to grow the stack\n",
+              curr_proc->proc_id, uc->code);
+      exit(-1);
+  }
 
-  // if (exception_is_requesting_more_stack) 
-  // then enlarge stack to cover uc->addr
+  /* Loop through each page in virtuall memory and allocate a physical frame */
+  for (i = addr_pg; i <= top_stack_pg; i++) {
+      temp_ent = (curr_proc->region1_pt + i);
 
+      // If there's no page allocated for this
+      if (temp_ent->valid == (u_long) 0x0) {
+
+        // Check that there are enough physical pages
+        if (count_items(&FrameList) <= 0) { /* This counting is inefficient... */
+            TracePrintf(3, "\tProcess %d requested more memory for the stack, but there are not enough physical frames\n",
+                    curr_proc->proc_id);
+            exit(-1);
+        }
+
+        // Allocate the pages
+        // Set it to valid with the proper permissions
+        temp_ent->valid = (u_long) 0x1;
+        temp_ent->prot = (u_long) (PROT_READ | PROT_WRITE);
+        // Get it a page
+        temp_ent->pfn = (u_long) (((pop(&FrameList))->id * PAGESIZE) >> PAGESHIFT);
+      }
+  }
+  
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+  /* Is there anything I'm forgetting? */
   // otherwise imitate TRAP_ILLEGAL(uc)
 } 
 

@@ -24,7 +24,6 @@ int Yalnix_Wait(int *status_ptr) {
   // empty exited_children
   // switch to another available process
 } 
-
 int Yalnix_GetPid() { 
   return curr_proc->proc_id;
 } 
@@ -71,7 +70,7 @@ int Yalnix_Brk(void *addr) {
         add_to_list(&FrameList, (void *)NULL, (r1_pagetable[i].pfn << PAGESHIFT) / PAGESIZE);
       }
   }
-
+  curr_proc->brk_addr = top_pg_heap << PAGESHIFT;
   return SUCCESS;
 }
 
