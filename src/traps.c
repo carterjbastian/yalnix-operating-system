@@ -10,7 +10,14 @@
 #include "linked_list.h"
 
 // used by a couple different traps
-void abort_process(int pid) { 
+void abort_current_process(UserContext *uc) { 
+
+
+  TracePrintf(1, "Aborting Process with PID: %d", curr_proc->proc_id);
+  add_to_list(dead_procs, curr_proc, curr_proc->proc_id);
+  remove_from_list(all_procs, curr_proc);
+  switch_to_next_available_proc(uc, 0);
+
 } 
 
 /*
@@ -70,13 +77,9 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
   }
 
   // Are there more processes waiting?
-  if (count_items(ready_procs) > 0) {
-    PCB_t *next_proc = pop(ready_procs)->data;
-
-    if (perform_context_switch(curr_proc, next_proc, uc) != 0) {
-      TracePrintf(1, "Context Switch failed\n");
-    }
-  }
+  if (count_items(ready_procs) > 0) { 
+    switch_to_next_available_proc(uc, 1);
+  } // else just continue running current process
   
   TracePrintf(1, ">>> HANDLE_TRAP_CLOCK\n");
 
