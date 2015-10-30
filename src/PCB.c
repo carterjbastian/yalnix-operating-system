@@ -13,6 +13,9 @@
 
 
 PCB_t *new_process(UserContext *uc) { 
+  
+  TracePrintf(1, "Start: new_process\n");
+  
   // Allocate a new Process Control Block
   PCB_t *pcb = (PCB_t *) malloc( sizeof(PCB_t) );
 
@@ -27,5 +30,8 @@ PCB_t *new_process(UserContext *uc) {
   available_process_id++;
   pcb->kc_p = (KernelContext *)malloc(sizeof(KernelContext));
   // Default value for kc
+
+  TracePrintf(1, "End: new_process\n");
+
   return pcb;
 }

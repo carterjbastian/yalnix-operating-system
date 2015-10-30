@@ -11,13 +11,12 @@
 
 // used by a couple different traps
 void abort_current_process(UserContext *uc) { 
-
-
-  TracePrintf(1, "Aborting Process with PID: %d", curr_proc->proc_id);
+  
+  TracePrintf(1, "Start: abort_current_process (PID: %d)\n", curr_proc->proc_id);
   add_to_list(dead_procs, curr_proc, curr_proc->proc_id);
   remove_from_list(all_procs, curr_proc);
   switch_to_next_available_proc(uc, 0);
-
+  TracePrintf(1, "End: abort_current_process (PID: %d)\n", curr_proc->proc_id);
 } 
 
 /*
@@ -54,7 +53,7 @@ which generates periodic clock interupts
 */
 void HANDLE_TRAP_CLOCK(UserContext *uc) { 
 
-  TracePrintf(1, "HANDLE_TRAP_CLOCK\n");
+  TracePrintf(1, "Start: HANDLE_TRAP_CLOCK\n");
 
   // perform context switch to ready_proccesses.first()
   // should implement round-robin process scheduling with 
@@ -78,11 +77,13 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
 
   // Are there more processes waiting?
   if (count_items(ready_procs) > 0) { 
+    TracePrintf(1, "Switching processes\n");
     switch_to_next_available_proc(uc, 1);
-  } // else just continue running current process
+  } else { 
+    TracePrintf(1, "No process to switch to - gonna keep going\n");
+  }
   
-  TracePrintf(1, ">>> HANDLE_TRAP_CLOCK\n");
-
+  TracePrintf(1, "End: HANDLE_TRAP_CLOCK\n");
 } 
 
 /*
@@ -109,13 +110,16 @@ user process.
 
 */
 void HANDLE_TRAP_MEMORY(UserContext *uc) { 
-  TracePrintf(1, "HANDLE_TRAP_MEMORY: addr %p\n", uc->addr);
+  TracePrintf(1, "Start: HANDLE_TRAP_MEMORY\n");
+  TracePrintf(1, "addr %p .. sp %p .. pc %p \n", uc->addr, uc->sp, uc->pc);
 
   // Check if this is a permissions error
   if (uc->code == YALNIX_ACCERR) {
-      TracePrintf(3, "\tProcess %d had a permissions error at addr %p\n",
+      TracePrintf(1, "Process %d had a permissions error at addr %p\n",
               curr_proc->proc_id, uc->code);
       exit(-1);
+  } else if (uc->code == YALNIX_MAPERR) { 
+    TracePrintf(1, "Process %d had a mapping error \n", curr_proc->proc_id);
   }
 
   // Otherwise, it's an access error
@@ -161,6 +165,7 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   /* Is there anything I'm forgetting? */
   // otherwise imitate TRAP_ILLEGAL(uc)
+  TracePrintf(1, "End: HANDLE_TRAP_MEMORY\n");
 } 
 
 /*

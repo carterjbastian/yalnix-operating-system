@@ -35,8 +35,10 @@ int ks_npg = KERNEL_STACK_MAXSIZE / PAGESIZE;
  
 */
 void SetKernelData(void * _KernelDataStart, void *_KernelDataEnd) { 
+  TracePrintf(1, "Start: SetKernelData \n");
   kernel_data_start = _KernelDataStart; 
   kernel_data_end = _KernelDataEnd;
+  TracePrintf(1, "End: SetKernelData \n");
 }
 
 /* 
@@ -46,6 +48,7 @@ void SetKernelData(void * _KernelDataStart, void *_KernelDataEnd) {
 void KernelStart(char *cmd_args[], 
                  unsigned int pmem_size,
                  UserContext *uctxt) { 
+  TracePrintf(1, "Start: KernelStart \n");
 
   // the break is initially the kernel_data_end
   kernel_brk = kernel_data_end;
@@ -57,7 +60,6 @@ void KernelStart(char *cmd_args[],
 
   // store interupt vector declared at top of file
   WriteRegister(REG_VECTOR_BASE, (unsigned int) &interrupt_vector);
-  TracePrintf(1, "Wrote the interrupt vector\n");
 
   //r1_pagetable = (struct pte *)malloc(VMEM_1_PAGE_COUNT * sizeof(struct pte));
   // Set up Frame-related variables
@@ -210,11 +212,12 @@ void KernelStart(char *cmd_args[],
    */
   memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
 
-  TracePrintf(1, "Made it to the end of KernelStart\n");
+  TracePrintf(1, "End: KernelStart\n");
 } 
 
 void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
-    TracePrintf(1, "\t==> MyKCSClone\n");
+    TracePrintf(1, "Start: MyKCSClone \n");
+
     PCB_t *curr = (PCB_t *) curr_pcb_p;
     PCB_t *next = (PCB_t *) next_pcb_p;
 
@@ -248,12 +251,12 @@ void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     TracePrintf(1, "Restored old kernel page mappings\n");
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
-    TracePrintf(1, "\t==> MyKCSClone done\n");
+    TracePrintf(1, "End: MyKCSClone \n");
     return next->kc_p;
 }
 
 KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
-    TracePrintf(1, "\t==> MyKCSSwitch\n");
+    TracePrintf(1, "Start: MyKCSSwitch\n");
     int i, j;
     PCB_t *curr = (PCB_t *) curr_pcb_p;
     PCB_t *next = (PCB_t *) next_pcb_p;
@@ -281,19 +284,20 @@ KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pc
     TracePrintf(1, "Restored next procs kernel stack\n");
     // Restore the next region's Region 1 by setting the pointer to the
     // page table
+    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
     WriteRegister(REG_PTBR1, (unsigned int) next->region1_pt);
     TracePrintf(1, "Restored next procs r1\n");
     // Flush the TLB
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
 
-    TracePrintf(1, "\t==> MyKCSSwitch done\n");
+    TracePrintf(1, "End: MyKCSSwitch\n");
     return next->kc_p;
 }
 
 
 // IMPT: assumes ready_procs.count > 0
 int switch_to_next_available_proc(UserContext *uc, int should_run_again){ 
-
+    TracePrintf(1, "Start: switch_to_next_available_proc \n");
   // Put the old process on the ready queue if needed
   if (should_run_again) { 
     add_to_list(ready_procs, (void *) curr_proc, curr_proc->proc_id);
@@ -302,12 +306,16 @@ int switch_to_next_available_proc(UserContext *uc, int should_run_again){
   PCB_t *next_proc = pop(ready_procs)->data;
   if (perform_context_switch(curr_proc, next_proc, uc) != 0) {
     TracePrintf(1, "Context Switch failed\n");
+    TracePrintf(1, "End: switch_to_next_available_proc \n");
+    return -1;
   }
   
+  TracePrintf(1, "End: switch_to_next_available_proc \n");
+  return 0;
 } 
 
 int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
-    TracePrintf(1, "\t===> perform_context_switch\n");
+  TracePrintf(1, "Start: perform_context_switch\n");
     int rc;
       
     memcpy((void *)curr->uc, (void *) uc, sizeof(UserContext) );      
@@ -324,8 +332,7 @@ int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
         
     memcpy((void *)uc, (void *) curr_proc->uc, sizeof(UserContext) );
 
-    TracePrintf(1, "Actually made it out back to perform_context_switch\n");
-    TracePrintf(1, "\t===> perform_context_switch done\n");
+    TracePrintf(1, "End: perform_context_switch\n");
     return rc;
 }
 
@@ -351,7 +358,7 @@ void DoIdle() {
 */
 int SetKernelBrk(void * addr) { 
   int i;  
-  TracePrintf(1, "Inside SetKernelBrk\n");
+  TracePrintf(1, "Start: SetKernelBrk\n");
   // Check that the requested address is within the proper bounds of
   // where the break should ever be allowed to be
   if ((unsigned int) addr > (unsigned int)KERNEL_STACK_BASE || addr < kernel_data_start) {
@@ -394,7 +401,7 @@ int SetKernelBrk(void * addr) {
     // Flush the TLB register
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_0);
 
-    TracePrintf(1, "Finishing SetKernelBrk\n");
+    TracePrintf(1, "End: SetKernelBrk\n");
     return 0;
   }
 }
