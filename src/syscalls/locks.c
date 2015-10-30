@@ -1,6 +1,6 @@
 // locks.c
 
-#include <pthread.h>   // for threads
+#include "syscalls.h"
 
 int LockInit(int *lock_idp) { 
   // lock = init lock with lock_idpOB

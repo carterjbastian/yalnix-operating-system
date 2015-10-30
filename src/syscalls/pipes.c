@@ -1,4 +1,5 @@
 // pipes.c
+#include "syscalls.h"
 
 int PipeInit(int *pip_idp) { 
 

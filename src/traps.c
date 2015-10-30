@@ -1,11 +1,11 @@
 // traps.c
+/*
+ * System Includes
+ */
 #include <hardware.h>
-#include "syscalls/cvars.h"
-#include "syscalls/gen_syscalls.h"
-#include "syscalls/locks.h"
-#include "syscalls/pipes.h"
-#include "syscalls/tty.h"
+#include <yalnix.h>
 
+#include "syscalls/syscalls.h"
 #include "kernel.h"
 #include "linked_list.h"
 
@@ -28,21 +28,49 @@ like creating new process, mem allocation or I/O.
 */
 void HANDLE_TRAP_KERNEL(UserContext *uc) { 
   // arguments to kernel call are in uc->regs
-  // execute requrest kernal call (uc->code)
+  // execute requested kernal call (uc->code)
 
-  /*
-    int return_val;
+  
+  int retval;
+
+  // Local variables for syscall arguments
+  void *addr;               // Address for YALNIX_GETPID
+  int clock_ticks;          // Number of clock ticks for YALNIX_DELAY
     switch(uc->code) { 
-      case SYS_CALL_CONSTANT_HERE (see yalnix.h): 
-        return_val = sys_call_goes_here(uc->regs[x], uc->regs[x+1] ...);
+      case YALNIX_FORK: 
         break;
-      case ...
-      case ...
+
+      case YALNIX_EXEC:
+        break;
+
+      case YALNIX_EXIT:
+        break;
+
+      case YALNIX_WAIT:
+        break;
+
+      case YALNIX_GETPID:
+        retval = Yalnix_GetPid();
+        break;
+
+      case YALNIX_BRK:
+        addr = (void *) uc->regs[0];
+        retval = Yalnix_Brk(addr);
+        break;
+
+      case YALNIX_DELAY:
+        clock_ticks = (int) uc->regs[0];
+        retval = Yalnix_Delay(uc, clock_ticks);
+        break;
+
+      default:
+        TracePrintf(3, "Unrecognized syscall: %d\n", uc->code);
+        break;
     } 
 
-    uc->regs[0] = return_val;
+    uc->regs[0] = retval;
 
-  */
+  
 } 
 
 /* 

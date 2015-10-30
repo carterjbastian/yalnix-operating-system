@@ -434,11 +434,11 @@ int switch_to_next_available_proc(UserContext *uc, int should_run_again){
   if (perform_context_switch(curr_proc, next_proc, uc) != 0) {
     TracePrintf(1, "Context Switch failed\n");
     TracePrintf(1, "End: switch_to_next_available_proc \n");
-    return -1;
+    return ERROR;
   }
 
   TracePrintf(1, "End: switch_to_next_available_proc \n");
-  return 0;
+  return SUCCESS;
 } 
 
 /*

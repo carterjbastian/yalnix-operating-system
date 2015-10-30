@@ -24,22 +24,26 @@ SRCDIR = /media/sf_ringo/src
 USRDIR = /media/sf_ringo/usr_progs
 
 #List all kernel source files here.  
-KERNEL_SRCS = $(SRCDIR)/kernel.c $(SRCDIR)/PCB.c $(SRCDIR)/linked_list.c $(SRCDIR)/traps.c $(SRCDIR)/load_program.c
-#List the objects to be formed form the kernel source files here.  Should be the same as the prvious list, replacing ".c" with ".o" 
-KERNEL_OBJS = $(SRCDIR)/kernel.o $(SRCDIR)/PCB.o $(SRCDIR)/linked_list.o $(SRCDIR)/traps.o $(SRCDIR)/load_program.o
-#List all of the header files necessary for your kernel
-KERNEL_INCS = $(SRCDIR)/kernel.h $(SRCDIR)/PCB.h $(SRCDIR)/linked_list.h $(SRCDIR)/traps.h 
+KERNEL_SRCS = $(SRCDIR)/kernel.c $(SRCDIR)/PCB.c $(SRCDIR)/linked_list.c \
+	      $(SRCDIR)/traps.c $(SRCDIR)/load_program.c $(SRCDIR)/syscalls/gen_syscalls.c
 
-U_OBJ_DIR = $(USRDIR)/objs
+#List the objects to be formed form the kernel source files here.  Should be the same as the prvious list, replacing ".c" with ".o" 
+KERNEL_OBJS = $(SRCDIR)/kernel.o $(SRCDIR)/PCB.o $(SRCDIR)/linked_list.o \
+	      $(SRCDIR)/traps.o $(SRCDIR)/load_program.o $(SRCDIR)/syscalls/gen_syscalls.o
+
+#List all of the header files necessary for your kernel
+KERNEL_INCS = $(SRCDIR)/kernel.h $(SRCDIR)/PCB.h $(SRCDIR)/linked_list.h $(SRCDIR)/traps.h \
+	      $(SRCDIR)/syscalls/syscalls.h
+
 
 #List all user programs here.
-USER_APPS = $(USRDIR)/init
+USER_APPS = $(USRDIR)/init $(USRDIR)/simple_getpid
 
 #List all user program source files here.  SHould be the same as the previous list, with ".c" added to each file
-USER_SRCS = $(USRDIR)/init.c
+USER_SRCS = $(USRDIR)/init.c $(USRDIR)/simple_getpid.c
 
 #List the objects to be formed form the user  source files here.  Should be the same as the prvious list, replacing ".c" with ".o"
-USER_OBJS = $(USRDIR)/init.o
+USER_OBJS = $(USRDIR)/init.o $(USRDIR)/simple_getpid.o
 
 #List all of the header files necessary for your user programs
 USER_INCS = 
@@ -100,7 +104,7 @@ all: $(ALL)
 
 clean:
 	rm -f *.o *~ TTYLOG* TRACE $(YALNIX_OUTPUT) $(USER_APPS) $(USER_OBJS)  core.*
-	rm -f ./src/*.o 
+	rm -f ./src/*.o ./src/syscalls/*.o
 
 count:
 	wc $(KERNEL_SRCS) $(USER_SRCS)

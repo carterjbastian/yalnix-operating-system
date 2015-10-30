@@ -16,7 +16,7 @@ typedef struct PCB_t {
   struct pte *region1_pt;
   List *children;
   List *exited_children;
-  int *delay_clock_ticks;
+  int delay_clock_ticks;
   int heap_base_page;
   unsigned int brk_addr;
 } PCB_t;

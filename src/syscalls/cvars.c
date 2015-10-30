@@ -1,6 +1,6 @@
 // cvars.c
 
-#include <pthread.h>
+#include "syscalls.h"
 
 int CvarInit(int *cvar_idp) { 
   // pthread_cond_t cvar = init with cvar_idp

@@ -5,7 +5,7 @@
  * System Includes
  */
 #include <hardware.h>
-
+#include <yalnix.h>
 /*
  * Local Includes
  */
@@ -21,7 +21,6 @@
 #define KS_NPG  (KERNEL_STACK_MAXSIZE / PAGESIZE)
 
 #define KILL    -1
-#define ERROR   1
 #define SUCCESS 0
 /*
  * Global Variables

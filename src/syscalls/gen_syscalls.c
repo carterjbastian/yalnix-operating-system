@@ -1,6 +1,14 @@
-#include "kernel.h"
-#include "PCB.h"
+/*
+ * System includes
+ */
+#include <hardware.h>
 
+/*
+ * Local Includes
+ */
+#include "../kernel.h"
+#include "../PCB.h"
+#include "syscalls.h"
 // int Yalnix_Fork(UserContext *uc) ? not sure 
 // what input args are here
 int Yalnix_Fork() {
@@ -45,7 +53,7 @@ int Yalnix_Exec(char *filename, char **argvec) {
 }
 
 
-Void Yalnix_Exit(int status) { 
+void Yalnix_Exit(int status) { 
   // release_resources(GetPid());
   //   release locks cvars
   //   set children's parent to null
@@ -94,7 +102,7 @@ int Yalnix_Brk(void *addr) {
           r1_pagetable[i].valid = (u_long) 0x1;
           r1_pagetable[i].prot = (u_long) (PROT_READ | PROT_WRITE);
           r1_pagetable[i].pfn = (u_long) ( (PMEM_BASE + 
-                  (pop(&FrameList)->id * PAGE_SIZE) ) >> PAGESHIFT);
+                  (pop(&FrameList)->id * PAGESIZE) ) >> PAGESHIFT);
       }
   }
 
@@ -108,14 +116,22 @@ int Yalnix_Brk(void *addr) {
   return SUCCESS;
 }
 
-int Yalnix_Delay(int clock_ticks) { 
+int Yalnix_Delay(UserContext *uc, int clock_ticks) { 
+  // Check parameters for validity
   if (clock_ticks < 0) return ERROR;
   if (clock_ticks == 0) return SUCCESS;
 
-  add_to_list(blocked_procs, curr_proc, curr_proc->pid);
+  // Add this process to the list of blocked processes
+  add_to_list(blocked_procs, curr_proc, curr_proc->proc_id);
   curr_proc->delay_clock_ticks = clock_ticks;
-  PCB *next_proc = pop(ready_procs)->data;
-  perform_context_switch(curr_proc, next_proc);
+
+  if (count_items(ready_procs) <= 0) {
+    TracePrintf(3, "No Items on the Ready queue to switch to!\n");
+    // crash here?
+  } else {
+    if (switch_to_next_available_proc(uc, 0) != SUCCESS)
+        TracePrintf(3, "Switch to next available process failed\n");
+  }  
   
   return SUCCESS;
 } 
