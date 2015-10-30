@@ -76,11 +76,12 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
   }
 
   // Are there more processes waiting?
+  TracePrintf(1, "Proc Id: %d\n", curr_proc->proc_id);
   if (count_items(ready_procs) > 0) { 
     TracePrintf(1, "Switching processes\n");
     switch_to_next_available_proc(uc, 1);
   } else { 
-    TracePrintf(1, "No process to switch to - gonna keep going\n");
+    TracePrintf(1, "No process to switch to or in proc 1- gonna keep going\n");
   }
   
   TracePrintf(1, "End: HANDLE_TRAP_CLOCK\n");

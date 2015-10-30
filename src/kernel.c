@@ -132,7 +132,7 @@ void KernelStart(char *cmd_args[],
 
   /* Change the pc and sp of the new process' UserContext */
   idle_proc->uc->pc = &DoIdle; // pc points to idle function
-
+  idle_proc->region1_pt = &r1_pagetable[0];
   // Allocate two physical frames for the idle process' stack
   // and leave the very top one empty (so the hardware doesn't throw a fit)
   ListNode *free_frame = pop(&FrameList);
@@ -303,7 +303,7 @@ int switch_to_next_available_proc(UserContext *uc, int should_run_again){
     add_to_list(ready_procs, (void *) curr_proc, curr_proc->proc_id);
   } 
   
-  PCB_t *next_proc = pop(ready_procs)->data;
+  PCB_t *next_proc = (pop(ready_procs))->data;
   if (perform_context_switch(curr_proc, next_proc, uc) != 0) {
     TracePrintf(1, "Context Switch failed\n");
     TracePrintf(1, "End: switch_to_next_available_proc \n");
@@ -317,11 +317,12 @@ int switch_to_next_available_proc(UserContext *uc, int should_run_again){
 int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
   TracePrintf(1, "Start: perform_context_switch\n");
     int rc;
-      
+
+    // Don't copy the pc var
     memcpy((void *)curr->uc, (void *) uc, sizeof(UserContext) );      
-    
+
     // Store current proc's region 0 and 1 pointers
-    curr->region1_pt = &r1_pagetable[0];
+    //curr->region1_pt = &r1_pagetable[0];
       
     // Update the current process global variable
     curr_proc = next;
