@@ -147,8 +147,10 @@ void KernelStart(char *cmd_args[],
   // Assign the new process' context's stack pointer to the top of the stack
   idle_proc->uc->sp = (void *) (VMEM_1_LIMIT - PAGESIZE);
   
+  
   // Allocate space for the KernelContext (in the idle proc)
   idle_proc->kc_p = (KernelContext *)malloc( sizeof(KernelContext) );
+  idle_proc->kc_set = 1; // we'll set it on first clock trap no matter what
   /* Store pointers to the first page table entries in the PCB instance */
   idle_proc->region0_pt = (struct pte *)malloc( ks_npg * sizeof(struct pte));
   memcpy((void *)idle_proc->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
@@ -164,7 +166,7 @@ void KernelStart(char *cmd_args[],
   /* Internal Book Keeping with new process */ 
   add_to_list(all_procs, (void *)idle_proc, idle_proc->proc_id);    // update processes list with idle process
   curr_proc = idle_proc;
-
+  
 
   // Make the init process
   PCB_t *init_proc = new_process(idle_proc->uc);
@@ -208,25 +210,20 @@ void KernelStart(char *cmd_args[],
    */
   memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
 
-  // Clone the KernelContext and KernelStack for idle proc into init proc
-  int rc = KernelContextSwitch(MyKCSClone, (void *) idle_proc, (void *) init_proc);
-
   TracePrintf(1, "Made it to the end of KernelStart\n");
 } 
 
-KernelContext *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
+void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     TracePrintf(1, "\t==> MyKCSClone\n");
     PCB_t *curr = (PCB_t *) curr_pcb_p;
     PCB_t *next = (PCB_t *) next_pcb_p;
-    // Copy the kc passed in to the PBC of the new proc
-    memcpy( (void *) (next->kc_p), (void *)kc_in, sizeof(KernelContext) );
-    TracePrintf(1, "Copied the KC into the new proc\n"); 
 
     int i;
     u_long old_pfns[ks_npg];
     unsigned int dest;
     unsigned int src;
 
+    WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
     // Temporarily map the kernel stack into frames in the current 
     for (i = 0; i < ks_npg; i++) {
         old_pfns[i] = r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].pfn;
@@ -263,7 +260,13 @@ KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pc
 
     // Copy the kernel context to save it
     memcpy( (void *) (curr->kc_p), (void *)kc_in, sizeof(KernelContext));
-    TracePrintf(1, "Copied Kernel Context\n"); 
+
+    if (next->kc_set == 0) { 
+      next->kc_p = curr->kc_p;
+      MyKCSClone(kc_in, curr_pcb_p, next_pcb_p);
+      next->kc_set = 1;
+      TracePrintf(1, "Copied Kernel Context into next\n"); 
+    }
 
     // Store the current region's kernel stack with a memcpy
     memcpy((void *) curr->region0_pt,
@@ -319,7 +322,7 @@ int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
     // Do the switch with magic function
     rc = KernelContextSwitch(MyKCSSwitch, (void *) curr, (void *) next);
         
-    memcpy((void *)uc, (void *) curr->uc, sizeof(UserContext) );
+    memcpy((void *)uc, (void *) curr_proc->uc, sizeof(UserContext) );
 
     TracePrintf(1, "Actually made it out back to perform_context_switch\n");
     TracePrintf(1, "\t===> perform_context_switch done\n");

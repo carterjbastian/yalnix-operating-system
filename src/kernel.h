@@ -72,6 +72,6 @@ int SetKernelBrk(void *addr);
 
 void DoIdle();
 
-KernelContext *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p);
+void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p);
 KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p);
 #endif // _KERNEL_H_
