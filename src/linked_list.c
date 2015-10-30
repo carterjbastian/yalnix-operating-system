@@ -28,19 +28,32 @@ void add_to_list(List *list, void *data, int id) {
 // our linked list 
 int remove_from_list(List *list, void * data) { 
   ListNode *node = list->first;
+
   while(node && node->data != data) { 
     node = node->next;
   }
 
   if (!node) return -1;
-  
-  node->prev->next = node->next;
-  if (node->next) { 
-    node->next->prev = node->prev;
+
+ 
+  if (node->prev) { // This is not the first item in the list
+    node->prev->next = node->next;
+
+    if (node->next) { // Not the last item in the list
+        node->next->prev = node->prev;
+    }
+
+  } else { // This is the first item in the list
+
+    if (node->next) {  // This is not the last/only item in the list
+        node->next->prev = node->prev;
+        list->first = node->next;
+    } else { // This is the only item in the list
+        list->first = NULL;
+    }
   } 
 
   free(node);
-
   return 0;
 } 
 

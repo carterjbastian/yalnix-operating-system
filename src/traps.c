@@ -99,7 +99,21 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
         if (proc->delay_clock_ticks <= 0) { 
             add_to_list(ready_procs, proc, proc->proc_id);
         }
-        iterator = iterator->next; 
+    } 
+    
+    // Remove all the process that are no longer blocked from the blocked queue
+    iterator = blocked_procs->first;
+    while(iterator->next != NULL) {
+        PCB_t *data = iterator->data;
+        iterator = iterator->next;
+
+        if (data->delay_clock_ticks <= 0)
+            remove_from_list(blocked_procs, data);
+    }
+
+    // Check the last item in the list
+    if (((PCB_t *)iterator->data)->delay_clock_ticks <= 0) {
+      remove_from_list(blocked_procs, iterator->data);
     } 
   }
 

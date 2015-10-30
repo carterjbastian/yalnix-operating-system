@@ -37,13 +37,13 @@ KERNEL_INCS = $(SRCDIR)/kernel.h $(SRCDIR)/PCB.h $(SRCDIR)/linked_list.h $(SRCDI
 
 
 #List all user programs here.
-USER_APPS = $(USRDIR)/init $(USRDIR)/simple_getpid
+USER_APPS = $(USRDIR)/init $(USRDIR)/simple_getpid $(USRDIR)/delay
 
 #List all user program source files here.  SHould be the same as the previous list, with ".c" added to each file
-USER_SRCS = $(USRDIR)/init.c $(USRDIR)/simple_getpid.c
+USER_SRCS = $(USRDIR)/init.c $(USRDIR)/simple_getpid.c $(USRDIR)/delay.c
 
 #List the objects to be formed form the user  source files here.  Should be the same as the prvious list, replacing ".c" with ".o"
-USER_OBJS = $(USRDIR)/init.o $(USRDIR)/simple_getpid.o
+USER_OBJS = $(USRDIR)/init.o $(USRDIR)/simple_getpid.o $(USRDIR)/delay.o
 
 #List all of the header files necessary for your user programs
 USER_INCS = 
