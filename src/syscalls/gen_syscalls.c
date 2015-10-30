@@ -1,13 +1,47 @@
 #include "kernel.h"
+#include "PCB.h"
 
+// int Yalnix_Fork(UserContext *uc) ? not sure 
+// what input args are here
 int Yalnix_Fork() {
-  // create_child_page_tables() 
-  // create_child_pcb()
-  // copy_kernal_stack_data_to_child()
+  /*
+
+  rough draft: 
+
+  // save uc (if we can grab it in input)
+  memcpy(curr_proc->uc, uc, sizeof(UserContext));
+
+  // create child
+  PCB_t *child = new_process(uc);
+  // create child page tables? 
+  add_to_list(curr_proc->children, child, child->proc_id);
+  
+  // copy region 0 pointers? region 1 pointers? 
+  // along with maybe some other data: 
+  child->heap_base_page = curr_proc->heap_base_page;
+  
+  add_to_list(ready_procs, curr_proc, curr_proc->id);
+  perform_context_switch(curr_proc, child, uc);
+
+  */
 } 
 
 int Yalnix_Exec(char *filename, char **argvec) { 
-  // filename.main(argvec[0], argvec.count[1]) ?
+  /* 
+     rough draft:
+     
+     ? PCB_t *new_proc = new_process(curr_proc->uc) ?
+     
+     // this might do more than we need though... 
+     // walkthrough seems to imply that it does, 
+     // not sure though
+     load_program(filename, argvec, new_proc); 
+
+     we don't want perform_context_switch because exec 
+     is supposed to literally replace the running process
+     with the new one...
+
+  */
 }
 
 
