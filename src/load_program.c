@@ -56,9 +56,6 @@ LoadProgram(char *name, char *args[], PCB_t *proc)
    */
   // Since we'll be messing with page tables
   struct pte proc_pagetable[VMEM_1_PAGE_COUNT];
-  struct pte **proc_pagetable_pt = &proc_pagetable;
-  proc_pagetable_pt = &(proc->region1_pt);
-
 
   /*
    * Briefly modify the Page Tables so that we can write to the new process'
