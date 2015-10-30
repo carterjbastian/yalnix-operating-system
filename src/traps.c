@@ -182,7 +182,7 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
       exit(-1);
   }
 
-  /* Loop through each page in virtuall memory and allocate a physical frame */
+  /* Loop through each page in virtual memory and allocate a physical frame */
   for (i = addr_pg - 128; i <= top_stack_pg - 128; i++) {
       temp_ent = (curr_proc->region1_pt + i);
 
