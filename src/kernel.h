@@ -11,12 +11,14 @@
  */
 #include "linked_list.h"
 #include "PCB.h"
+#include "traps.h"
 
 /*
  * Constants
  */
 #define VMEM_1_PAGE_COUNT     (((VMEM_1_LIMIT - VMEM_1_BASE) / PAGESIZE))
 #define VMEM_0_PAGE_COUNT     (((VMEM_0_LIMIT - VMEM_0_BASE) / PAGESIZE))
+#define KS_NPG  (KERNEL_STACK_MAXSIZE / PAGESIZE)
 
 #define KILL    -1
 #define ERROR   1

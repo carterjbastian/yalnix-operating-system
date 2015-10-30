@@ -7,8 +7,6 @@
 #include "traps.h"
 #include "PCB.h"
 
-// Private Function Declarations
-int first_context_switch(PCB_t *curr, PCB_t *next, char *fname, char *args[]);
 
 // Statically declared interrupt_vector
 void (*interrupt_vector[8]) = {
@@ -21,7 +19,6 @@ void (*interrupt_vector[8]) = {
   HANDLE_TRAP_TTY_TRANSMIT,
   HANDLE_TRAP_DISK
 };
-int ks_npg = KERNEL_STACK_MAXSIZE / PAGESIZE;
 
 /*
 
@@ -36,51 +33,85 @@ int ks_npg = KERNEL_STACK_MAXSIZE / PAGESIZE;
 */
 void SetKernelData(void * _KernelDataStart, void *_KernelDataEnd) { 
   TracePrintf(1, "Start: SetKernelData \n");
+
   kernel_data_start = _KernelDataStart; 
   kernel_data_end = _KernelDataEnd;
+
   TracePrintf(1, "End: SetKernelData \n");
 }
 
 /* 
  * Completes init and sets up first userland process, 
  * and passes pointer to a UserContext
+ *
+ * PseudoCode:
+ *  - Initalize global variables;
  */
 void KernelStart(char *cmd_args[], 
                  unsigned int pmem_size,
                  UserContext *uctxt) { 
+
   TracePrintf(1, "Start: KernelStart \n");
 
-  // the break is initially the kernel_data_end
-  kernel_brk = kernel_data_end;
 
-  // set up initial global variables, declare a local iterator
-  int i;
-  available_process_id = 0;
-  vm_en = 0;
+  /*
+   * =========================================
+   *        Declare local variables
+   * =========================================
+   */
 
-  // store interupt vector declared at top of file
-  WriteRegister(REG_VECTOR_BASE, (unsigned int) &interrupt_vector);
+  int i;                                // Iterator for loops
+  int base_frame_r1;                    // Lowest frame in region 1
+  int top_frame_r1;                     // Highest frame in region 1
 
-  //r1_pagetable = (struct pte *)malloc(VMEM_1_PAGE_COUNT * sizeof(struct pte));
-  // Set up Frame-related variables
+  PCB_t *idle_proc;                     // An idle process (the parent proc)
+  int idle_stack_fnum1;                 // Number of idle's 1st stack frame
+  int idle_stack_fnum2;                 // Number of idle's 2nd stack frame
+
+  int lp_rc;                            // Return code of load program
+
+
+  /*
+   * =========================================
+   *    Initialize Global Kernel Variables,
+   *      Privileged registers, and local
+   *      variables for KernelStart.
+   * =========================================
+   */
+
+  // Global Variable Initialziation
+  kernel_brk = kernel_data_end;         // break starts as kernel_data_end
+  available_process_id = 0;             // PIDs start at 0
+  vm_en = 0;                            // VM is initially disabled
+
+  // Physical Frame-related variables
   total_pframes = pmem_size / PAGESIZE;
   pframes_in_kernel = (VMEM_0_LIMIT >> PAGESHIFT);
-  pframes_in_use = UP_TO_PAGE(kernel_brk) >> PAGESHIFT;
-  int base_frame_r1 = DOWN_TO_PAGE(VMEM_1_BASE) >> PAGESHIFT;
-  int top_frame_r1 = UP_TO_PAGE(VMEM_1_LIMIT) >> PAGESHIFT;
+  pframes_in_use = UP_TO_PAGE(kernel_brk) >> PAGESHIFT;     // Is this necessary forever?
+  
+  base_frame_r1 = DOWN_TO_PAGE(VMEM_1_BASE) >> PAGESHIFT;
+  top_frame_r1 = UP_TO_PAGE(VMEM_1_LIMIT) >> PAGESHIFT;
 
-  // Allocate kernel heap space for the Kernel's linked lists / queues
+  // Allocate kernel heap space for the Kernel's Process Queues
   ready_procs = (List *)malloc( sizeof(List) );
   blocked_procs = (List *)malloc( sizeof(List) );
   all_procs = (List *)malloc( sizeof(List) ); 
   dead_procs = (List *)malloc( sizeof(List) ); 
 
-  // Create the list of empty frames (storing the frame number as
-  // the Node's ID)
+  // Create the list of empty frames
+    // NOTE: in FrameList, the number of the physical frame is
+    //      stored in the id field of the node, NOT data.
   for (i = pframes_in_kernel; i < total_pframes; i++)
       add_to_list(&FrameList, (void *) NULL, i);
 
-  // Set up page tables for what's already in use.
+
+  /*
+   * =========================================
+   *    Set up the page tables for what's 
+   *    already in use by the kernel.
+   * =========================================
+   */
+
   for (i = 0; i < pframes_in_kernel; i++) {
     // Create an empty page table entry structure
     struct pte entry;
@@ -105,115 +136,158 @@ void KernelStart(char *cmd_args[],
   // Create pte items for the pages in R1 (pre-allocating pages)
   for (i = base_frame_r1; i < top_frame_r1; i++) {
     struct pte entry; // New pte entry
-    // So far this page is invalid, has read/write protections, and has no
-    // physical frame.
+
+    // So far, page is invalid, has read/write protections, and no pfn
     entry.valid = (u_long) 0x0;
     entry.prot = (u_long) (PROT_READ | PROT_WRITE);
     entry.pfn = (u_long) 0x0;
-    // Actually add the page to the pagetable (accounting for 0-indexing)
+
+    // Add the page to the pagetable (accounting for 0-indexing)
     r1_pagetable[i - base_frame_r1] = entry;
   }
 
-  // Set up the page tables in the right places with privileged hardware
-  // registers  
+
+  /*
+   * =========================================
+   *    Configure the Privileged Registers
+   *      and enable Virtual Memory  
+   * =========================================
+   */
+
+  // Set up the page tables in the right places in the hardware regs
   WriteRegister(REG_PTBR0, (unsigned int) &r0_pagetable);
   WriteRegister(REG_PTBR1, (unsigned int) &r1_pagetable);
   WriteRegister(REG_PTLR0, (unsigned int) VMEM_0_PAGE_COUNT);
   WriteRegister(REG_PTLR1, (unsigned int) VMEM_1_PAGE_COUNT);
 
-  // enable virtual memory
+  // store interupt vector declared at top of file
+  WriteRegister(REG_VECTOR_BASE, (unsigned int) &interrupt_vector);
+
+  // Enable Virtual memory and flush the TLB
   WriteRegister(REG_VM_ENABLE, 1);
-  TracePrintf(1, "Virtual Memory Enabled!\n");
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   vm_en = 1; 
+  TracePrintf(1, "Virtual Memory Enabled!\n");
 
-  /* create idle process (see PCB.c) */
-  PCB_t *idle_proc = new_process(uctxt); // Allocates internally
 
-  /* Change the pc and sp of the new process' UserContext */
-  idle_proc->uc->pc = &DoIdle; // pc points to idle function
-  idle_proc->region1_pt = &r1_pagetable[0];
-  // Allocate two physical frames for the idle process' stack
-  // and leave the very top one empty (so the hardware doesn't throw a fit)
-  ListNode *free_frame = pop(&FrameList);
-  ListNode *free_frame2 = pop(&FrameList);
-  int idle_stack_fnum = free_frame->id;
-  int idle_stack_fnum2 = free_frame2->id;
+  /*
+   * =========================================
+   *    Create the idle process
+   * =========================================
+   */
 
-  // Update the r1 page table with validity & pfn
+  // Create a shell process
+  idle_proc = new_process(uctxt); // Allocates internally (see PCB.c)
+
+  // Set up the user stack by allocating two frames
+  // leaving the very top one empty (for the hardware)
+  idle_stack_fnum1 = pop(&FrameList)->id;
+  idle_stack_fnum2 = pop(&FrameList)->id;
+
+  // Update the r1 page table with validity & pfn of idle's stack
   r1_pagetable[VMEM_1_PAGE_COUNT - 1].valid = (u_long) 0x1;
-  r1_pagetable[VMEM_1_PAGE_COUNT - 1].pfn = (u_long) ((idle_stack_fnum * PAGESIZE) >> PAGESHIFT);
+  r1_pagetable[VMEM_1_PAGE_COUNT - 1].pfn = (u_long) ((idle_stack_fnum1 * PAGESIZE) >> PAGESHIFT);
   r1_pagetable[VMEM_1_PAGE_COUNT - 2].valid = (u_long) 0x1;
   r1_pagetable[VMEM_1_PAGE_COUNT - 2].pfn = (u_long) ((idle_stack_fnum2 * PAGESIZE) >> PAGESHIFT);
-
-  // Assign the new process' context's stack pointer to the top of the stack
-  idle_proc->uc->sp = (void *) (VMEM_1_LIMIT - PAGESIZE);
-  
-  
-  // Allocate space for the KernelContext (in the idle proc)
-  idle_proc->kc_p = (KernelContext *)malloc( sizeof(KernelContext) );
-  idle_proc->kc_set = 1; // we'll set it on first clock trap no matter what
-  /* Store pointers to the first page table entries in the PCB instance */
-  idle_proc->region0_pt = (struct pte *)malloc( ks_npg * sizeof(struct pte));
-  memcpy((void *)idle_proc->region0_pt, (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), ks_npg * sizeof(struct pte));
-
-  idle_proc->region1_pt = (struct pte *)malloc( VMEM_1_PAGE_COUNT * sizeof(struct pte));
-  memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
-  //idle_proc->region1_pt = r1_pagetable;
-  
 
   // flush the TLB region 1 since we changed r1_pagetable
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_1);
 
-  /* Internal Book Keeping with new process */ 
-  add_to_list(all_procs, (void *)idle_proc, idle_proc->proc_id);    // update processes list with idle process
-  curr_proc = idle_proc;
+
+  // Manually assign values to the PCB structure and UserContext for idle
+  idle_proc->uc->pc = &DoIdle;                                  // pc points to idle function
+  idle_proc->uc->sp = (void *) (VMEM_1_LIMIT - PAGESIZE);       // Manually created stack
+
+  idle_proc->region1_pt = &r1_pagetable[0];
+ 
+  // Allocate space for the KernelContext (in the idle proc)
+  idle_proc->kc_p = (KernelContext *)malloc( sizeof(KernelContext) );
+  idle_proc->kc_set = 1;    // we'll set it on first clock trap no matter what
+
+  // Allocate idle's kernel stack page table
+  idle_proc->region0_pt = (struct pte *)malloc( KS_NPG * sizeof(struct pte));
+
+  // Copy idle's kernel stack page table
+  memcpy((void *)idle_proc->region0_pt,
+          (void *) &(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT]), 
+          KS_NPG * sizeof(struct pte));
+
+  // Allocate idle's region 1 page table
+  idle_proc->region1_pt = (struct pte *)malloc( VMEM_1_PAGE_COUNT * sizeof(struct pte));
+
+  // Copy over idle's region 1 page table
+  memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
   
 
-  // Make the init process
+
+  /*
+   * =========================================
+   *    Create the init process
+   * =========================================
+   */
+
+  // Make a shell process based on idle_proc
   PCB_t *init_proc = new_process(idle_proc->uc);
 
-
   // Allocate space for init's Kernel Stack and Region 1 ptes
-  init_proc->region0_pt = (struct pte *)malloc((KERNEL_STACK_MAXSIZE / PAGESIZE)  * sizeof(struct pte));
+  init_proc->region0_pt = (struct pte *)malloc(KS_NPG  * sizeof(struct pte));
   init_proc->region1_pt = (struct pte *)malloc(VMEM_1_PAGE_COUNT * sizeof(struct pte));
 
-  TracePrintf(1, "Initializing r1 mem\n");
 
-  // Initialize this memory space
+  // Initialize R1 memory to be invalid, with r/w protections, and no pfn 
   for (i = 0; i < VMEM_1_PAGE_COUNT; i++) {
-    
     (*(init_proc->region1_pt + i)).valid = (u_long) 0x0;
     (*(init_proc->region1_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
+    (*(init_proc->region1_pt + i)).pfn = (u_long) 0x0;
   }
-  TracePrintf(1, "Initializing r0 mem\n");
 
-  for (i = 0; i < KERNEL_STACK_MAXSIZE / PAGESIZE; i++) {
+  // Initialize kernel stack memory to be valid, with r/w protections, and a pfn
+  for (i = 0; i < KS_NPG; i++) {
     (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
     (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);  
   }
   
+  // Flush the TLB having updated pagetables
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   
-  TracePrintf(1, "Starting to load the program in from mem\n");
+  // Get the argument list and program name from args passed to KernelStart
   char *arglist[] = {"init", '\0'};
   char *progname = "./usr_progs/init";
   
-  
-  int lp_rc = LoadProgram(progname, arglist, init_proc);
-  TracePrintf(1, "LoadProgram returned with code %d\n", lp_rc);
-  add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
+  // Load the program from the text file
+  if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
+    TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
+    // Is there more that needs to be done here?
+  }
+
+
+  /*
+   * =========================================
+   *    Kernel Bookkeeping for new processes
+   * =========================================
+   */
+
+  // update the all_procs queue
+  add_to_list(all_procs, (void *)idle_proc, idle_proc->proc_id);
   add_to_list(all_procs, (void *)init_proc, init_proc->proc_id);
 
-  /* 
-   * Copy the newly created idle process' UserContext into the current
-   * UserContext with memcpy.
-   */
+  // We're going to start with idle and then switch to init
+  add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
+  curr_proc = idle_proc; 
+
+  // Copy idle's UserContext into the current UserContext
   memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
+
 
   TracePrintf(1, "End: KernelStart\n");
 } 
+
+
+
+
+
+
 
 void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     TracePrintf(1, "Start: MyKCSClone \n");
@@ -222,31 +296,31 @@ void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     PCB_t *next = (PCB_t *) next_pcb_p;
 
     int i;
-    u_long old_pfns[ks_npg];
+    u_long old_pfns[KS_NPG];
     unsigned int dest;
     unsigned int src;
 
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
     // Temporarily map the kernel stack into frames in the current 
-    for (i = 0; i < ks_npg; i++) {
-        old_pfns[i] = r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].pfn;
-        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].valid = (u_long) 0x1;
-        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].pfn = ((*(next->region0_pt + i)).pfn);
+    for (i = 0; i < KS_NPG; i++) {
+        old_pfns[i] = r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].pfn;
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].valid = (u_long) 0x1;
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].pfn = ((*(next->region0_pt + i)).pfn);
     }
     TracePrintf(1, "Temporarily mapped kstack frames into current mapping\n");
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
     TracePrintf(1, "Flushed the TLB\n");
 
     // Copy the contents of the current kernel stack into the new kernel stack
-    dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg) << PAGESHIFT;
+    dest = ((KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG) << PAGESHIFT;
     src = KERNEL_STACK_BASE;
     memcpy( (void *)dest, (void *)src, KERNEL_STACK_MAXSIZE);
     TracePrintf(1, "Copied the kstack contents\n");
 
     // Restore the old kernel page mappings
-    for (i = 0; i < ks_npg; i++) {
-        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].pfn = old_pfns[i];
-        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - ks_npg + i].prot = (u_long)0x0;
+    for (i = 0; i < KS_NPG; i++) {
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].pfn = old_pfns[i];
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].prot = (u_long)0x0;
     }
     TracePrintf(1, "Restored old kernel page mappings\n");
     WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
@@ -254,6 +328,8 @@ void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     TracePrintf(1, "End: MyKCSClone \n");
     return next->kc_p;
 }
+
+
 
 KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     TracePrintf(1, "Start: MyKCSSwitch\n");
@@ -274,13 +350,13 @@ KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pc
     // Store the current region's kernel stack with a memcpy
     memcpy((void *) curr->region0_pt,
             (void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
-            ks_npg * (sizeof(struct pte)));
+            KS_NPG * (sizeof(struct pte)));
 
     TracePrintf(1, "Stored current procs kernel stack\n");
     //Restore the next region's kernel stack
     memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
             (void *) next->region0_pt,
-            ks_npg * (sizeof(struct pte)));
+            KS_NPG * (sizeof(struct pte)));
     TracePrintf(1, "Restored next procs kernel stack\n");
     // Restore the next region's Region 1 by setting the pointer to the
     // page table
@@ -406,4 +482,3 @@ int SetKernelBrk(void * addr) {
     return 0;
   }
 }
-
