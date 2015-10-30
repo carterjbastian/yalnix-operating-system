@@ -20,8 +20,7 @@
 #make all will make all the kernel objects and user objects
 ALL = $(KERNEL_ALL) $(USER_APPS)
 KERNEL_ALL = yalnix
-#SRCDIR = /media/sf_yalnix/src
-SRCDIR = /media/sf_ringo/src# I use this one b/c I named my folder differently
+SRCDIR = /media/sf_ringo/src
 USRDIR = /media/sf_ringo/usr_progs
 
 #List all kernel source files here.  
@@ -100,7 +99,7 @@ CPPFLAGS= -m32 -fno-builtin -I. -I$(INCDIR) -g -DLINUX
 all: $(ALL)	
 
 clean:
-	rm -f *.o *~ TTYLOG* TRACE $(YALNIX_OUTPUT) $(USER_APPS)  core.*
+	rm -f *.o *~ TTYLOG* TRACE $(YALNIX_OUTPUT) $(USER_APPS) $(USER_OBJS)  core.*
 	rm -f ./src/*.o 
 
 count:
