@@ -69,7 +69,7 @@ void KernelStart(char *cmd_args[],
   int idle_stack_fnum2;                 // Number of idle's 2nd stack frame
 
   int lp_rc;                            // Return code of load program
-
+  int arg_count;                        // The number of arguments passed into cmd_args
 
   /*
    * =========================================
@@ -252,13 +252,40 @@ void KernelStart(char *cmd_args[],
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   
   // Get the argument list and program name from args passed to KernelStart
-  char *arglist[] = {"init", '\0'};
-  char *progname = "./usr_progs/init";
-  
-  // Load the program from the text file
-  if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
-    TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
-    // Is there more that needs to be done here?
+  if (cmd_args[0] == '\0') {
+    // Default arguments
+    char *arglist[] = {"init", '\0'};
+    char *progname = "./usr_progs/init";
+
+    // Load the program from the text file
+    if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
+      TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
+      // Is there more that needs to be done here?
+    }
+
+  } else {
+      arg_count = 0;
+      // Count the number of command line arguments
+      while (cmd_args[arg_count] != '\0') {
+          arg_count++;
+      }
+      arg_count++; // Account for the null termination
+      
+      // Copy them into an argument list (null terminated)
+      char *arglist[arg_count];
+      for (i = 0; i < arg_count; i++) {
+        arglist[i] = cmd_args[i];
+      }
+
+      // First argument is the program name
+      char *progname = arglist[0];
+
+    // Load the program from the text file
+    if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
+      TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
+      // Is there more that needs to be done here?
+    }
+
   }
 
 
