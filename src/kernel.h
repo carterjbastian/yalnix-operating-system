@@ -22,6 +22,13 @@
 
 #define KILL    -1
 #define SUCCESS 0
+
+/*
+ * Usefull Macros
+ */
+#define FNUM_TO_PFN(n) ((u_long) (((int)(n) * PAGESIZE) >> PAGESHIFT))
+
+
 /*
  * Global Variables
  */

@@ -62,9 +62,12 @@ ListNode* pop(List *list) {
   if (!node) return NULL;
   
   list->first = node->next;
-  if (node->next) { 
+  if (node->next) { // There's another node in the list
     node->next->prev = NULL;
-  } 
+  } else { // This was the only node in the list
+    list->first = NULL;
+  }
+
 
   return node;
 } 

@@ -4,7 +4,7 @@
 /*
  * Syscalls implemented in gen_syscalls.c
  */
-int Yalnix_Fork();
+int Yalnix_Fork(UserContext *uc);
 
 int Yalnix_Exec(char *filename, char **argvec);
 

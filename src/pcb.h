@@ -8,17 +8,23 @@
  * Type Definitions and Structures
  */
 typedef struct PCB_t { 
+  // Initialized and/or allocated in new_process()
   unsigned int proc_id;
-  UserContext *uc; 
+  UserContext *uc;      // Be sure to copy in Fork 
   KernelContext *kc_p;
-  int kc_set;
+
+
+  // Must be allocted when creating the process
   struct pte *region0_pt;
   struct pte *region1_pt;
-  List *children;
-  List *exited_children;
-  int delay_clock_ticks;
+
+  // Initialized to 0 or null
+  List *children;         // Allocate in Fork
+  List *exited_children;  // Allocate in Fork
+  int delay_clock_ticks;  // Set upon delay
   int heap_base_page;
   unsigned int brk_addr;
+  int kc_set;             // Set to 1 after a MyKCSClone call
 } PCB_t;
   
 /*

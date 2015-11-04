@@ -38,6 +38,7 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
   int clock_ticks;          // Number of clock ticks for YALNIX_DELAY
     switch(uc->code) { 
       case YALNIX_FORK: 
+        retval = Yalnix_Fork(uc);
         break;
 
       case YALNIX_EXEC:

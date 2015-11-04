@@ -232,7 +232,7 @@ void KernelStart(char *cmd_args[],
   // Allocate space for init's Kernel Stack and Region 1 ptes
   init_proc->region0_pt = (struct pte *)malloc(KS_NPG  * sizeof(struct pte));
   init_proc->region1_pt = (struct pte *)malloc(VMEM_1_PAGE_COUNT * sizeof(struct pte));
-
+  bzero((char *)(init_proc->region1_pt), VMEM_1_PAGE_COUNT * sizeof(struct pte));
 
   // Initialize R1 memory to be invalid, with r/w protections, and no pfn 
   for (i = 0; i < VMEM_1_PAGE_COUNT; i++) {
@@ -328,6 +328,7 @@ void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
 
     int i;
     u_long old_pfns[KS_NPG];
+    u_long old_validity[KS_NPG];
     unsigned int dest;
     unsigned int src;
 
@@ -337,6 +338,8 @@ void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     // Temporarily map the kernel stack into frames in the current region 1
     for (i = 0; i < KS_NPG; i++) {
         old_pfns[i] = r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].pfn;
+        old_validity[i] = r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].valid;
+
         r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].valid = (u_long) 0x1;
         r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].pfn = ((*(next->region0_pt + i)).pfn);
     }
@@ -352,7 +355,7 @@ void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p) {
     // Restore the old kernel page mappings
     for (i = 0; i < KS_NPG; i++) {
         r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].pfn = old_pfns[i];
-        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].prot = (u_long)0x0;
+        r0_pagetable[(KERNEL_STACK_BASE >> PAGESHIFT) - KS_NPG + i].valid = old_validity[i];
     }
 
     // Having changed the R0 pagetables, flush the tlb again
