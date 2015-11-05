@@ -229,24 +229,159 @@ int Yalnix_Fork(UserContext *uc) {
 
 
 
+/*
+ * Function: Yalnix_Exec
+ *  @uc: The user context passed into the trap handler
+ *
+ * Description:
+ *
+ * PsuedoCode:
+ *
+ * Returns: Error to the original program on failure
+ *    Nothing to the new program if it's loaded successfully.
+ */
+int Yalnix_Exec(UserContext *uc) { 
+  TracePrintf(1, "\tStart: Yalnix_Exec\n");
+
+  /*
+   * Local Variables
+   */
+  int argc;                   // The number of arguments passed into new program 
+  char *filename;             // The filename of the new program
+  char **argv;                // Null-terminated list of arguments to new program
+
+  char *fname_p;              // The pointer to the filename passed via the uc
+  char **arg_p;                // The pointer to the filename passed via the uc
+
+  PCB_t *proc;                // The process that's being switched out of
+
+  int i;                      // Iterator variable for loops
+  int len;                    // A length variable for string size counting
+  int rc;                     // Return code variable
+  /*
+   * Parse the filename, argc, argv[] arguments.
+   */
+
+  // Get the pointers from the UC
+  fname_p = (char *) uc->regs[0];
+  arg_p = (char **) uc->regs[1];
+
+  // Copy the filename into a permanent, kernel location
+  filename = (char *) malloc((strlen(fname_p) + 1) * sizeof(char));
+  if (!filename) { // Malloc Check
+    TracePrintf(3, "Failed to allocate memory for the file to be execed into\n");
+    return(ERROR);
+  }
+  
+  memcpy((void *)filename, (void *)fname_p, ((strlen(fname_p) + 1) * sizeof(char)));
+
+  // Count the number of arguments
+  argc = 0;
+  while ((*(arg_p + argc)) != '\0')
+    argc++;
+
+  argc++; // The null pointer counts
+
+  // Allocate space for argc character pointers in argv
+  argv = (char **) malloc (argc * sizeof(char *));
+  if (!argv) { // Malloc check
+    TracePrintf(3, "Failed to allocate memory for the file to be execed into\n");
+    return(ERROR);
+  }
+
+  // Loop through the arguments, copying them into argv
+  for (i = 0; i < argc - 1; i++) { // Don't include the null pointer
+    len = strlen(*(arg_p + i)) + 1; // include the null pointer
+    
+    // Allocate space for this argument
+    argv[i] = (char *) malloc(len * sizeof(char));
+    if (!argv[i]){
+      TracePrintf(3, "Failed to allocate memory for the file to be execed into\n");
+      return(ERROR);
+    }
+    memcpy((void *)argv[i], (void *)(*(arg_p + i)), len);
+  }
+
+  // Add the null pointer
+  //argv[argc - 1] = (char *) malloc(1);
+  argv[argc - 1] = '\0';
+
+  /* WARNING: need to do more thorough input checking on these arguments! */
+  TracePrintf(1, "Exec: Finished copything the arguments and filename\n");
 
 
-int Yalnix_Exec(char *filename, char **argvec) { 
-  /* 
-     rough draft:
-     
-     ? PCB_t *new_proc = new_process(curr_proc->uc) ?
-     
-     // this might do more than we need though... 
-     // walkthrough seems to imply that it does, 
-     // not sure though
-     load_program(filename, argvec, new_proc); 
+  /*
+   * Edit the PCB_t and UC pointers to resemble a blank process
+   *
+   * For the UC:
+   *  vector, code, and addr are left alone
+   *  pc, sp, and ebp will be changed inside LoadProgram
+   *  regs[8] is cleared to zeros
+   *
+   * For the PCB:
+   *  proc_id, uc, and  are left alone
+   *  kc_p will be re-initialized in MyKCSClone, so kc_set is set to 0
+   *  region0_pt and region1_pt are left alone, but their contents will change
+   *    in the next section
+   *  WARNING: What do we do with children and exited_children??
+   *  brk_addr and heap_break_page will be set in LoadProgram
+   */
 
-     we don't want perform_context_switch because exec 
-     is supposed to literally replace the running process
-     with the new one...
+  // Store the current process
+  proc = curr_proc;
 
-  */
+  // Clear the registers in the UserContext
+  bzero((void *)uc->regs, (8 * sizeof(u_long)));
+
+  // set kc_set to 0
+  proc->kc_set = 0;
+  
+
+  /*
+   * Trash the old Region 1 and reinitialize it to be blank
+   */
+  for (i = 0; i < VMEM_1_PAGE_COUNT; i++) {
+    if ( (*(proc->region1_pt + i)).valid == 0x1) {
+      // Put old frame back onto the frame list
+      add_to_list(&FrameList, (void *) NULL, PFN_TO_FNUM( (*(proc->region1_pt + i)).pfn ));
+      // Reset pte to defaults (defaults for protections should still apply)
+      (*(proc->region1_pt + i)).pfn = (u_long) 0x0;
+      (*(proc->region1_pt + i)).valid = (u_long) 0x0;
+    }
+  }
+
+
+  /*
+   * Trash the old kernel stack and reinitialize it
+   */
+  for (i = 0; i < KS_NPG; i++) {
+    // Keep default prot and valid settings, but give it a new physical frame
+    add_to_list(&FrameList, (void *) NULL, PFN_TO_FNUM((*(proc->region0_pt + i)).pfn));
+    // No need to verify that we have enough frames because we just added one
+    (*(proc->region0_pt + i)).pfn = FNUM_TO_PFN((pop(&FrameList))->id);
+  }
+  
+  // Flush the TLB with the new info
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+
+
+  /*
+   * Load in the next program with call to LoadProgram
+   */
+  rc = LoadProgram(filename, argv, proc);
+  if (rc != SUCCESS) {
+    /* WARNING: We need to figure out what to do here w/o a proc to return to */
+    TracePrintf(3, "FATAL ERROR: LoadProgram failed to load execed program\n");
+    return(ERROR);
+  }
+
+
+  /*
+   * Update the UserContext Pointer passed into the trap handler and 
+   * return successfully.
+   */
+  memcpy((void *)uc, (void *)proc->uc, sizeof(UserContext));
+  return 0;
 }
 
 

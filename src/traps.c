@@ -42,6 +42,7 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_EXEC:
+        retval = Yalnix_Exec(uc);
         break;
 
       case YALNIX_EXIT:

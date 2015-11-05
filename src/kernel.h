@@ -27,7 +27,7 @@
  * Usefull Macros
  */
 #define FNUM_TO_PFN(n) ((u_long) (((int)(n) * PAGESIZE) >> PAGESHIFT))
-
+#define PFN_TO_FNUM(n) (((n) << PAGESHIFT) / PAGESIZE)
 
 /*
  * Global Variables
