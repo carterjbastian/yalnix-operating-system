@@ -204,6 +204,9 @@ void KernelStart(char *cmd_args[],
   idle_proc->kc_p = (KernelContext *)malloc( sizeof(KernelContext) );
   idle_proc->kc_set = 1;    // we'll set it on first clock trap no matter what
 
+  // The idle process has no parent
+  idle_proc->parent = NULL;
+
   // Allocate idle's kernel stack page table
   idle_proc->region0_pt = (struct pte *)malloc( KS_NPG * sizeof(struct pte));
 
@@ -251,6 +254,13 @@ void KernelStart(char *cmd_args[],
   // Flush the TLB having updated pagetables
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
   
+  // init_proc is the first child of idle_proc!
+  init_proc->parent = idle_proc;
+
+  // Allocate idle_proc's child list and add init to it
+  idle_proc->children = (List *) malloc(sizeof(List));
+  add_to_list(idle_proc->children, (void *)init_proc, init_proc->proc_id);
+ 
   // Get the argument list and program name from args passed to KernelStart
   if (cmd_args[0] == '\0') {
     // Default arguments
@@ -382,9 +392,12 @@ KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pc
     PCB_t *next = (PCB_t *) next_pcb_p;
 
     // Save the current process' kernel context
-    memcpy( (void *) (curr->kc_p), (void *)kc_in, sizeof(KernelContext));
+    if (curr != NULL)
+      memcpy( (void *) (curr->kc_p), (void *)kc_in, sizeof(KernelContext));
 
     // If the next process has no kernel context, Clone the current one
+    /*
+     * WARNING: Could break if calling a new process out of an Exit call */
     if (next->kc_set == 0) {
       MyKCSClone(kc_in, curr_pcb_p, next_pcb_p);
       next->kc_set = 1;
@@ -392,9 +405,11 @@ KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pc
     }
 
     // Save the current process' kernel stack
-    memcpy((void *) curr->region0_pt,
-            (void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
-            KS_NPG * (sizeof(struct pte)));
+    if (curr != NULL) {
+      memcpy((void *) curr->region0_pt,
+              (void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
+              KS_NPG * (sizeof(struct pte)));
+    }
 
     // Restore the next region's kernel stack
     memcpy((void *) (&(r0_pagetable[KERNEL_STACK_BASE >> PAGESHIFT])),
@@ -458,7 +473,8 @@ int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
     int rc;
 
     // Store the user context of currently running process
-    memcpy((void *)curr->uc, (void *) uc, sizeof(UserContext) );      
+    if (curr != NULL)
+      memcpy((void *)curr->uc, (void *) uc, sizeof(UserContext) );      
 
     // Store the next process' user context in the uc variable
     memcpy((void *) uc, (void *) next->uc, sizeof(UserContext) );
@@ -475,6 +491,7 @@ int perform_context_switch(PCB_t *curr, PCB_t *next, UserContext *uc) {
     TracePrintf(1, "End: perform_context_switch\n");
     return rc;
 }
+
 
 // idle function for testing
 void DoIdle() {

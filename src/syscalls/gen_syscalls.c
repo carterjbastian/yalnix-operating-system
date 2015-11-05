@@ -12,6 +12,222 @@
 #include "syscalls.h"
 
 /*
+ * Function: Yalnix_Exit
+ *  @status: the integer status code upon exiting
+ *  @uc: The UserContext passed into the Trap Handler
+ *
+ * Description:
+ *
+ * Psuedocode:
+ *
+ * Returns nothing.
+ *
+ * ToDo:
+ *    - Sychronization Call clean up
+ *    - PID recycling
+ *    - Figure out how to halt the machine
+ *    - 
+ */
+void Yalnix_Exit(int status, UserContext *uc) {
+  TracePrintf(1, "Start: Yalnix_Exit\n");
+
+  /*
+   * Local Variables
+   */
+  int *status_p;                  // A pointer to the proc's exit status
+  int pid;                        // PID of the exiting process
+  int child_pid;                  // PID for a child
+
+  int has_kids;                   // 1 if proc has active children, 0 otherwise
+  int has_exited_kids;            // 1 if proc has exited kids, 0 otherwise
+  int has_parent;                 // 1 if proc is child of living process, 0 otherwise
+
+  PCB_t *parent;                  // Pointer to the parent process
+  PCB_t *proc;                    // Pointer to the process exiting
+  PCB_t *child;                   // Pointer to a child process (an iterator)
+  PCB_t *next;                    // Pointer to the next process to run
+
+  ListNode *iterator;             // For iterating through lists
+  ListNode *temp_node;            // For storing info returned from lists
+
+  int i;                          // Reusable loop iterator
+
+
+  /*
+   * Validate Input and store exit information
+   */
+
+  // Allocate kernel heap space for the exit status
+  status_p = (int *) malloc(sizeof(int));
+  *status_p = status;     // Copy the exit status' value
+  proc = curr_proc;
+
+  // Store the pid for ease of access
+  pid = curr_proc->proc_id;
+
+  // Control variables
+  has_kids = ((proc->children == NULL) ? 0 : 1);
+  has_exited_kids = ((proc->exited_children == NULL) ? 0 : 1);
+  has_parent = ((proc->parent == NULL) ? 0 : 1);
+
+  TracePrintf(1, "\tSet the local vars\n");
+  // Are we exiting the root process (init) with nothing to take its place?
+  if (pid == 0 && (count_items(ready_procs) <= 0)) {
+    TracePrintf(3, "\t===>\n\tFINAL EXIT: About to halt machine by exiting init\n");
+    // HALT THE MACHINE
+  }
+
+
+  /*
+   * Remove all traces of the proc from the kernel
+   */
+ 
+  /* WARNING: come back for this once synchronizations calls are done */ 
+  /* Release Locks, Cvars, and Pipes */
+    // DO THAT HERE
+
+  /* Disown Living Children */
+  child = NULL;
+
+  if (has_kids) {
+    // Remove pointer to self from all children's PCBs
+    while ((iterator = pop(proc->children)) != NULL) {
+      child = (PCB_t *) iterator->data;
+      child->parent = NULL;   // You rat bastard
+    }
+  }
+  TracePrintf(1, "\tDisowned Children\n");
+
+  /* Discard exited_children's uncollected exit statuses */
+  /* 
+   * NOTE: only the PIDs are stored in the exited children list.
+   *        There is no data item - only the id.
+   *        The exit status is stored only in the dead_procs global list.
+   */
+  if (has_exited_kids) {
+    // We don't need to store them any more in the dead_procs list
+    while ((iterator = pop(proc->exited_children)) != NULL) {
+      // First, find the node in the dead_procs list
+      child_pid = iterator->id;
+      temp_node = find_by_id(dead_procs, child_pid);
+     
+      // If the node is in the global dead_procs list, remove it
+      if (temp_node == NULL) {        // Does find_by_id return NULL?
+        TracePrintf(3, "Couldn't find the exited child (PID = %d) in global list\n", child_pid);
+      } else {
+        remove_from_list(dead_procs, temp_node->data);
+      }
+    }
+    // TO-DO: Recycle child_pid
+  }
+  TracePrintf(1, "\tDiscarded Exited Children\n");
+  /* Update Parent's list of children / exited children */
+  if (has_parent) {
+    parent = proc->parent;
+
+    // Remove exiting proc from parent's children list
+    if (remove_from_list(parent->children, (void *)proc) != 0)
+      TracePrintf(3, "Failed to remove exiting proc from parent's list of children\n");
+
+    // Add exiting proc to parent's exited children list
+    if (parent->exited_children == NULL) {
+      parent->exited_children = (List *) malloc(sizeof(List));
+      bzero(parent->exited_children, sizeof(List));
+    }
+
+    add_to_list(parent->exited_children, (void *)NULL, pid);
+  }
+  TracePrintf(1, "\tUpdated Parent's list of Children\n");
+
+  /* Move self from all_procs to dead_procs */
+  if (remove_from_list(all_procs, (void *)proc) != 0)
+    TracePrintf(3, "Failed to remove exiting proc from global list of all procs\n");
+
+  add_to_list(dead_procs, (void *) status_p, pid);
+  TracePrintf(1, "\tUpdated all_procs and dead_procs\n");
+
+
+  /*
+   * Trash the Page Tables
+   */
+
+  /* Deallocate frames in Kernel Stack */
+  for (i = 0; i < KS_NPG; i++) {
+    if ( (*(proc->region0_pt + i)).valid == 0x1 ) {
+      // Set it to invalid, free the physical frame, and reset the pfn
+      (*(proc->region0_pt + i)).valid = (u_long) 0x0;
+      add_to_list(&FrameList, (void *)NULL, PFN_TO_FNUM( (*(proc->region0_pt + i)).pfn ));
+      (*(proc->region0_pt + i)).pfn = (u_long) 0x0;
+    }
+  }
+  TracePrintf(1, "\tTrashed the Kernel Stack\n");
+
+  /* Deallocate frames in Region 1 */
+  for (i = 0; i < VMEM_1_PAGE_COUNT; i++) {
+    if ( (*(proc->region1_pt + i)).valid == 0x1 ) {
+      // Set it to invalid, free the physical frame, and reset the pfn
+      (*(proc->region1_pt + i)).valid = (u_long) 0x0;
+      add_to_list(&FrameList, (void *)NULL, PFN_TO_FNUM( (*(proc->region1_pt + i)).pfn ));
+      (*(proc->region1_pt + i)).pfn = (u_long) 0x0;
+    }
+  }
+  TracePrintf(1, "\tTrashed Region 1\n");
+
+  /* 
+   * I'm scared of flushing this. Are any of the variables in THIS function in
+   * the kernel stack that will be lost or changed?
+   */
+  WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
+  TracePrintf(1, "\tFlushed the Register\n");
+
+
+  /*
+   * Garbage Collection: Deallocate kernel heap resources
+   */
+  // Free Pointers to Family History Lists
+  if (has_kids)
+    free(proc->children);
+  if (has_exited_kids)
+    free(proc->exited_children);
+
+  // Free Pointers to Page Tables
+  free(proc->region1_pt);
+  free(proc->region0_pt);
+
+  // Free Pointers to UserContext and KernelContext
+  free(proc->uc);
+  free(proc->kc_p);
+
+  // Free Pointer to the Process Control Block itself
+  free(proc);
+
+  /*
+   * Move on to Next Process
+   */
+  // Get the next available process
+  next = (PCB_t *) pop(ready_procs)->data;
+  
+  // Ensure that we don't run a brand new (uninitialized) proc out of Exit call
+  while (next->kc_set == 0) {
+    add_to_list(ready_procs, (void *) next, next->proc_id);
+    next = (PCB_t *) pop(ready_procs)->data;
+  }
+
+  TracePrintf(1, "End: Yalnix_Exit\n");
+
+  // Call perform_context_switch with a null curr_proc pointer
+  if (perform_context_switch((PCB_t *) NULL, next, uc) != SUCCESS) {
+    TracePrintf(3, "Fatal Error: Failed to switch out of Exited Process (PID=%d)\n", pid);
+    // HALT MACHINE
+  }
+} 
+
+
+int Yalnix_Wait(int *status_ptr) { 
+  // empty exited_children
+  // switch to another available process
+} 
+/*
  * Function: Yalnix_Fork
  *  @uc: The user context of the current process passed into the trap handler
  *  
@@ -22,6 +238,8 @@
  *   The process ID of the child to the parent on success
  *   ERROR to the parent on failure (without creating the child)
  */
+
+
 int Yalnix_Fork(UserContext *uc) {
   TracePrintf(1, "Start: Yalnix_Fork()\n");
 
@@ -184,15 +402,15 @@ int Yalnix_Fork(UserContext *uc) {
   /*
    * Kernel Bookkeeping
    */
-  // Create (if necessary) and add to the parent's list of children
-  if (parent->children == NULL)
-      parent->children = (List *) malloc( sizeof(List) );
+  // Mark the child as the parent's
+  child->parent = parent;
 
+  // Add record of the child to the parent's List
+  if (parent->children == NULL) {
+    parent->children = (List *) malloc(sizeof(List));
+    bzero(parent->children, sizeof(List));
+  }
   add_to_list(parent->children, (void *)child, child->proc_id);
-
-  // Create parent's list of exited children if necessary
-  if (parent->exited_children == NULL)
-    parent->exited_children = (List *) malloc( sizeof(List) );
 
   // Update the kernel queues
   add_to_list(all_procs, (void *)child, child->proc_id);
@@ -385,19 +603,7 @@ int Yalnix_Exec(UserContext *uc) {
 }
 
 
-void Yalnix_Exit(int status) { 
-  // release_resources(GetPid());
-  //   release locks cvars
-  //   set children's parent to null
-  //   handler memory pointers
-  // store status 
-} 
 
-
-int Yalnix_Wait(int *status_ptr) { 
-  // empty exited_children
-  // switch to another available process
-} 
 int Yalnix_GetPid() { 
   return curr_proc->proc_id;
 } 

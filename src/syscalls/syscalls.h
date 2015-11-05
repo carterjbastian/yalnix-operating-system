@@ -8,7 +8,7 @@ int Yalnix_Fork(UserContext *uc);
 
 int Yalnix_Exec(UserContext *uc);
 
-void Yalnix_Exit(int status);
+void Yalnix_Exit(int status, UserContext *uc);
 
 int Yalnix_Wait(int *status_ptr);
 

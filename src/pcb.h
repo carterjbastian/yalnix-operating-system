@@ -21,6 +21,7 @@ typedef struct PCB_t {
   // Initialized to 0 or null
   List *children;         // Allocate in Fork
   List *exited_children;  // Allocate in Fork
+  struct PCB_t *parent;          // A pointer to this process' parent
   int delay_clock_ticks;  // Set upon delay
   int heap_base_page;
   unsigned int brk_addr;

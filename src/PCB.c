@@ -17,7 +17,7 @@ PCB_t *new_process(UserContext *uc) {
   
   // Allocate a new Process Control Block
   PCB_t *pcb = (PCB_t *) malloc( sizeof(PCB_t) );
-
+  
   // Allocate a new UserContext for the PCB
   pcb->uc = (UserContext *)malloc( sizeof(UserContext) );
 
@@ -34,6 +34,7 @@ PCB_t *new_process(UserContext *uc) {
 
   pcb->children = NULL;
   pcb->exited_children = NULL;
+  pcb->parent = NULL;
   pcb->delay_clock_ticks = 0;
   pcb->heap_base_page = 0;
   pcb->brk_addr = 0;

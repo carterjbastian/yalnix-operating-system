@@ -36,7 +36,9 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
   // Local variables for syscall arguments
   void *addr;               // Address for YALNIX_GETPID
   int clock_ticks;          // Number of clock ticks for YALNIX_DELAY
-    switch(uc->code) { 
+  int exit_status;          // The exit status for YALNIX_EXIT
+
+  switch(uc->code) { 
       case YALNIX_FORK: 
         retval = Yalnix_Fork(uc);
         break;
@@ -46,6 +48,8 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_EXIT:
+        exit_status = (int) uc->regs[0];
+        Yalnix_Exit(exit_status, uc);
         break;
 
       case YALNIX_WAIT:
