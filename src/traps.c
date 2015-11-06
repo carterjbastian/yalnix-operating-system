@@ -10,13 +10,12 @@
 #include "linked_list.h"
 
 // used by a couple different traps
-void abort_current_process(UserContext *uc) { 
+void abort_current_process(int exit_code, UserContext *uc) {
+  TracePrintf(1, "Kernel Trap Handler: Aborting Current Process. PID: %d, exit_code: %d\n", 
+      curr_proc->proc_id, exit_code);
   
-  TracePrintf(1, "Start: abort_current_process (PID: %d)\n", curr_proc->proc_id);
-  add_to_list(dead_procs, curr_proc, curr_proc->proc_id);
-  remove_from_list(all_procs, curr_proc);
-  switch_to_next_available_proc(uc, 0);
-  TracePrintf(1, "End: abort_current_process (PID: %d)\n", curr_proc->proc_id);
+  // Call the Exit syscall as normal
+  Yalnix_Exit(exit_code, uc);
 } 
 
 /*
@@ -144,12 +143,14 @@ or privileged instruction while not in kernel mode.
 
 */
 
-void HANDLE_TRAP_ILLEGAL(UserContext *uc) { 
-  // uc->addr contains mem address whose referenced 
-  // caused the exception
+void HANDLE_TRAP_ILLEGAL(UserContext *uc) {
+  // Provide a Trace for the User
+  TracePrintf(3, "Kernel Trap Handler: Illegal Instruction Exception (pid=%d)\n",
+      curr_proc->proc_id);
+  TracePrintf(3, "\tThe type of illegal instruction is %d\n", uc->code); 
   
-  // abort_process(uc->addr)
-  // continue_running_other_processes()
+  // Non-Obtrusively abort the process
+  abort_current_process(ERROR, uc);
 }
 
 /*
@@ -164,14 +165,28 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
 
   // Check if this is a permissions error
   if (uc->code == YALNIX_ACCERR) {
+      // Trace for the User
       TracePrintf(1, "Process %d had a permissions error at addr %p\n",
               curr_proc->proc_id, uc->code);
-      exit(-1);
-  } else if (uc->code == YALNIX_MAPERR) { 
-    TracePrintf(1, "Process %d had a mapping error \n", curr_proc->proc_id);
+      
+      // Abort the process
+      abort_current_process(ERROR, uc);
+
+  } else if (uc->code == YALNIX_MAPERR) {
+    // To decide whether this is a request to grow the stack or a genuine mapping
+    // error, check if the offending address is b/t the break and the stack
+    // pointer. If it is, assume, it's a request to grow the stack.
+    if ((unsigned int)uc->addr < curr_proc->brk_addr || 
+        (unsigned int)uc->addr > (unsigned int) uc->sp) {
+      
+      // Trace for the User
+      TracePrintf(1, "Process %d had a mapping error \n", curr_proc->proc_id);
+    
+      // Abort the Process
+      abort_current_process(ERROR, uc);
+    }
   }
 
-  // Otherwise, it's an access error
   
   /* Get the values of pages to loop through */
   unsigned int addr_pg = DOWN_TO_PAGE(uc->addr) >> PAGESHIFT;
@@ -184,8 +199,10 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
   /* Check if the requested address would interfere with the heap */
   if (addr_pg - usr_brk_pg <= 2) {
       TracePrintf(3, "\tProcess %d does not have enough memory to grow the stack\n",
-              curr_proc->proc_id, uc->code);
-      exit(-1);
+          curr_proc->proc_id, uc->code);
+
+      // Abort the process
+      abort_current_process(ERROR, uc);
   }
 
   /* Loop through each page in virtual memory and allocate a physical frame */
@@ -199,7 +216,9 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
         if (count_items(&FrameList) <= 0) { /* This counting is inefficient... */
             TracePrintf(3, "\tProcess %d requested more memory for the stack, but there are not enough physical frames\n",
                     curr_proc->proc_id);
-            exit(-1);
+            
+            // Abort the Process
+            abort_current_process(ERROR, uc);
         }
 
         // Allocate the pages
@@ -223,7 +242,13 @@ Results from division by 0, overflow, etc.
 
 */
 void HANDLE_TRAP_MATH(UserContext *uc) { 
-  // imitate TRAP_ILLEGAL
+  // Trace for the user
+  TracePrintf(3, "Kernel Trap Handler: Arithmetic Exception (PID:%d)\n",
+      curr_proc->proc_id);
+  TracePrintf(3, "\tType of Arithmetic Error: %d\n", uc->code);
+
+  // Abort the offending process non-obtrusively
+  abort_current_process(ERROR, uc);
 } 
 
 /*

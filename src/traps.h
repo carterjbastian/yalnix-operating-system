@@ -12,7 +12,7 @@ trap_handler_func INTERRUPT_VECTOR_TABLE[TRAP_VECTOR_SIZE];
 
 
 // Functions to handle traps as they arrive
-void abort_process(int pid);
+void abort_current_process(int exit_code, UserContext *uc);
 void HANDLE_TRAP_KERNEL(UserContext *uc);
 void HANDLE_TRAP_CLOCK(UserContext *uc);
 void HANDLE_TRAP_ILLEGAL(UserContext *uc);

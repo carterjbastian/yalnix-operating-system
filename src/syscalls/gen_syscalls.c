@@ -70,11 +70,10 @@ void Yalnix_Exit(int status, UserContext *uc) {
   has_exited_kids = ((proc->exited_children == NULL) ? 0 : 1);
   has_parent = ((proc->parent == NULL) ? 0 : 1);
 
-  TracePrintf(1, "\tSet the local vars\n");
   // Are we exiting the root process (init) with nothing to take its place?
   if (pid == 0 && (count_items(ready_procs) <= 0)) {
-    TracePrintf(3, "\t===>\n\tFINAL EXIT: About to halt machine by exiting init\n");
-    // HALT THE MACHINE
+    TracePrintf(3, "\t===>\n\tHALTING MACHINE: About to halt machine by exiting init\n");
+    exit(SUCCESS);
   }
 
 
@@ -96,7 +95,6 @@ void Yalnix_Exit(int status, UserContext *uc) {
       child->parent = NULL;   // You rat bastard
     }
   }
-  TracePrintf(1, "\tDisowned Children\n");
 
   /* Discard exited_children's uncollected exit statuses */
   /* 
@@ -120,7 +118,7 @@ void Yalnix_Exit(int status, UserContext *uc) {
     }
     // TO-DO: Recycle child_pid
   }
-  TracePrintf(1, "\tDiscarded Exited Children\n");
+  
   /* Update Parent's list of children / exited children */
   if (has_parent) {
     parent = proc->parent;
@@ -137,14 +135,13 @@ void Yalnix_Exit(int status, UserContext *uc) {
 
     add_to_list(parent->exited_children, (void *)NULL, pid);
   }
-  TracePrintf(1, "\tUpdated Parent's list of Children\n");
+
 
   /* Move self from all_procs to dead_procs */
   if (remove_from_list(all_procs, (void *)proc) != 0)
     TracePrintf(3, "Failed to remove exiting proc from global list of all procs\n");
 
   add_to_list(dead_procs, (void *) status_p, pid);
-  TracePrintf(1, "\tUpdated all_procs and dead_procs\n");
 
 
   /*
@@ -160,7 +157,6 @@ void Yalnix_Exit(int status, UserContext *uc) {
       (*(proc->region0_pt + i)).pfn = (u_long) 0x0;
     }
   }
-  TracePrintf(1, "\tTrashed the Kernel Stack\n");
 
   /* Deallocate frames in Region 1 */
   for (i = 0; i < VMEM_1_PAGE_COUNT; i++) {
@@ -171,14 +167,12 @@ void Yalnix_Exit(int status, UserContext *uc) {
       (*(proc->region1_pt + i)).pfn = (u_long) 0x0;
     }
   }
-  TracePrintf(1, "\tTrashed Region 1\n");
 
   /* 
    * I'm scared of flushing this. Are any of the variables in THIS function in
    * the kernel stack that will be lost or changed?
    */
   WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
-  TracePrintf(1, "\tFlushed the Register\n");
 
 
   /*
@@ -218,7 +212,8 @@ void Yalnix_Exit(int status, UserContext *uc) {
   // Call perform_context_switch with a null curr_proc pointer
   if (perform_context_switch((PCB_t *) NULL, next, uc) != SUCCESS) {
     TracePrintf(3, "Fatal Error: Failed to switch out of Exited Process (PID=%d)\n", pid);
-    // HALT MACHINE
+    // NOTE: more Trace info would be helpful here for the user
+    exit(ERROR);
   }
 } 
 
