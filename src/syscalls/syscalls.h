@@ -44,12 +44,11 @@ int Yalnix_CvarWait(int cvar_id, int lock_id);
 
 
 /*
- * Syscalls implemented in tty.c
+ * Syscalls implemented in tty.c (moved to gen_syscalls.c) 
  */
-int Yalnix_TtyWrite(char *msg);
+int Yalnix_TtyWrite(int tty_id, void *buf, int len);
 
-char * Yalnix_TtyRead(unsigned long tty_id);
-
+int Yalnix_TtyRead(int tty_id, void *buf, int len);
 
 /*
  * Syscalls implemented in pipes.c

@@ -3,7 +3,7 @@
  */
 #include <hardware.h>
 #include <string.h>
-
+#include "../tty.h"
 /*
  * Local Includes
  */
@@ -673,3 +673,65 @@ int Yalnix_Reclaim(int id) {
   // for lock/cvar/pipe in locks + cvars + pipes
   //   destory_and_release(item with id == id)
 } 
+
+int Yalnix_TtyWrite(int tty_id, void *buf, int len) { 
+
+  ListNode *node = find_by_id(ttys, tty_id);
+  tty *tty = node->data;
+  
+  // setting up the new buffer we'll write to 
+  // needs to be on heap to survive context switch
+  curr_proc->write_buf = (buffer *)malloc(sizeof(buffer));
+  curr_proc->write_buf->buf = (buffer *)malloc(sizeof(char)*TERMINAL_MAX_LINE);
+  memcpy(((buffer*)curr_proc->write_buf)->buf, ((buffer*)buf)->buf, sizeof(char)*len);
+  curr_proc->write_buf->len = len;
+  
+  add_to_list(tty->buffers, curr_proc->write_buf, 0);
+
+  // now we put ourselves on list of writers and start writing
+  add_to_list(tty->writers, curr_proc, curr_proc->proc_id);
+  TtyTransmit(tty_id, buf, len); 
+
+  // we've returned from transmit, but aren't finished writing. 
+  // so switch to another proc until we're done
+  switch_to_next_available_proc(curr_proc->uc, 0);
+  
+  return len;
+} 
+
+
+
+/* 
+   See if we have a buffer stored (ie. somebody already wrote). 
+   If not, wait until we're woken up (should be when a buffer 
+   is waiting for us...)
+
+   Todo: handle extremely long inputs (use multiple buffers)
+ */
+int Yalnix_TtyRead(int tty_id, void *buf, int len) { 
+  
+  ListNode *node = find_by_id(ttys, tty_id);
+  tty *tty = node->data;
+  List *buffers = tty->buffers;
+  ListNode *buf_node = pop(buffers);
+  buffer *stored_buf = buf_node->data;
+  
+  // if there's not stored buf, switch procs, then grab 
+  // it when we're awake
+  if (!stored_buf) { 
+    add_to_list(tty->readers, curr_proc, curr_proc->proc_id);
+    switch_to_next_available_proc(curr_proc->uc, 0);
+    // we just woke up, so now there should be a buff! 
+    ListNode *node = pop(buffers);
+    stored_buf = node->data;
+  } 
+
+  // should be a sanity check... 
+  if (!stored_buf) { 
+    TracePrintf(3, "Something went wrong in TtyRead..\n");
+    return ERROR;
+  }
+  
+  memcpy(((buffer*)buf)->buf, stored_buf->buf, len*sizeof(char));  
+  return len;
+}

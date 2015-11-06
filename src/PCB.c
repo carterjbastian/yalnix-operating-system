@@ -8,6 +8,7 @@
 /*
  * Local includes
  */
+#include "tty.h"
 #include "PCB.h"
 #include "kernel.h"
 
