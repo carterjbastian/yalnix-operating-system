@@ -5,6 +5,7 @@
 #include "hardware.h"
 #include "linked_list.h"
 #include "traps.h"
+#include "tty.h"
 #include "PCB.h"
 
 
@@ -222,7 +223,20 @@ void KernelStart(char *cmd_args[],
   memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
   
 
+  /*
+   * =========================================
+   *    Create additional data structs 
+   *    ( buffers, (todo: locks, cvars, pipes))
+   * =========================================
+   */
+  ttys = (List *)malloc( sizeof(List) );
+  for (i = 0; i < NUM_TERMINALS; i++) { 
+    tty *tty = malloc( sizeof(tty) );
+    tty->id = i;
+    add_to_list(ttys, tty, i); 
+  }
 
+  
   /*
    * =========================================
    *    Create the init process

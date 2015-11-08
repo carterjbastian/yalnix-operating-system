@@ -1,7 +1,7 @@
 #ifndef _PCB_H_
 #define _PCB_H_
-
 #include "linked_list.h"
+#include "tty.h"
 //#include "PageTable.h"
 
 /*
@@ -26,6 +26,8 @@ typedef struct PCB_t {
   int heap_base_page;
   unsigned int brk_addr;
   int kc_set;             // Set to 1 after a MyKCSClone call
+
+  buffer *write_buf; 
 } PCB_t;
   
 /*

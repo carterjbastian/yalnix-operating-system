@@ -50,6 +50,7 @@ unsigned int pframes_in_kernel;
 List *locks;
 List *cvars;
 List *pipes;
+List *ttys;
 
 // processes 
 PCB_t *curr_proc;

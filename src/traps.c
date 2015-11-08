@@ -4,7 +4,7 @@
  */
 #include <hardware.h>
 #include <yalnix.h>
-
+#include "tty.h"
 #include "syscalls/syscalls.h"
 #include "kernel.h"
 #include "linked_list.h"
@@ -36,6 +36,11 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
   void *addr;               // Address for YALNIX_GETPID
   int clock_ticks;          // Number of clock ticks for YALNIX_DELAY
   int exit_status;          // The exit status for YALNIX_EXIT
+  
+  // ttys:
+  int tty_id;
+  void *buf;
+  int len;
 
   switch(uc->code) { 
       case YALNIX_FORK: 
@@ -66,6 +71,20 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
       case YALNIX_DELAY:
         clock_ticks = (int) uc->regs[0];
         retval = Yalnix_Delay(uc, clock_ticks);
+        break;
+        
+      case YALNIX_TTY_WRITE:
+        tty_id = (int) uc->regs[0];
+        buf = (void *) uc->regs[1];
+        len = (int) uc->regs[2];
+        retval = Yalnix_TtyWrite(tty_id, buf, len);
+        break;
+
+      case YALNIX_TTY_READ:
+        tty_id = (int) uc->regs[0];
+        buf = (void *) uc->regs[1];
+        len = (int) uc->regs[2];
+        retval = Yalnix_TtyRead(tty_id, buf, len);
         break;
 
       default:
@@ -252,17 +271,34 @@ void HANDLE_TRAP_MATH(UserContext *uc) {
 } 
 
 /*
-
 Results from complete line of input being available 
 from one of the terminals attached to system.
-
 */
 void HANDLE_TRAP_TTY_RECEIVE(UserContext *uc) { 
-  // read input using TtpReceive hardware op
-  // if necessary, buffer input line for a subsequent 
-  // TtyRead kernall call by some user process
 
-  // (terminal indicated by uc->code) 
+  TracePrintf(1, "Start: Handle_trap_tty_receive");
+  
+  int id = uc->code; 
+  ListNode *tty_node = find_by_id(ttys, id);
+  tty *tty = tty_node->data;
+  
+  buffer *new_buf = (buffer *)malloc(sizeof(buffer));
+  new_buf->buf = (buffer *)malloc(TERMINAL_MAX_LINE*sizeof(char));
+  new_buf->len = TtyReceive(tty->id, new_buf->buf, TERMINAL_MAX_LINE);
+  
+  // now that we've grabbed the text, let's store it: 
+  add_to_list(tty->buffers, new_buf, 0);
+  
+  // if a reader is waiting, let's wake him/her up:
+  List *readers = tty->readers;
+  ListNode *waiter_node = pop(readers);
+  PCB_t *waiter = waiter_node->data; 
+  if (waiter) { 
+    remove_from_list(tty->readers, waiter);
+    add_to_list(ready_procs, waiter, 0);
+  } 
+
+  TracePrintf(1, "End: Handle_trap_tty_receive");
 } 
 
 /* 
@@ -272,7 +308,18 @@ on a TtyTransmit) has been completely sent to terminal.
 
 */
 void HANDLE_TRAP_TTY_TRANSMIT(UserContext *uc) { 
-  // (terminal indicated by uc->code) 
+
+  TracePrintf(1, "Start: Handle_trap_tty_transmit");
+  
+  int id = uc->code; 
+  ListNode *tty_node = find_by_id(ttys, id);
+  tty *tty = tty_node->data;
+  
+  remove_from_list(tty->writers, curr_proc);
+  add_to_list(ready_procs, curr_proc, curr_proc->proc_id);
+  add_to_list(tty->buffers, curr_proc->write_buf, 0);
+
+  TracePrintf(1, "End: Handle_trap_tty_transmit");
 } 
 
 void HANDLE_TRAP_DISK(UserContext *uc) {
