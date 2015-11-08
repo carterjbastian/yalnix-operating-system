@@ -12,6 +12,25 @@
 #include "syscalls.h"
 
 /*
+ * Function: Yalnix_Wait
+ *  @status_ptr: A pointer to an integer to hold the child's return status
+ *
+ * Description:
+ *
+ * Pseudocode:
+ *
+ * Returns either the PID of the child that exited or ERROR.
+ *
+ * ToDo:
+ *
+ */
+int Yalnix_Wait(int *status_ptr) { 
+  // empty exited_children
+  // switch to another available process
+}
+
+
+/*
  * Function: Yalnix_Exit
  *  @status: the integer status code upon exiting
  *  @uc: The UserContext passed into the Trap Handler
@@ -218,10 +237,7 @@ void Yalnix_Exit(int status, UserContext *uc) {
 } 
 
 
-int Yalnix_Wait(int *status_ptr) { 
-  // empty exited_children
-  // switch to another available process
-} 
+ 
 /*
  * Function: Yalnix_Fork
  *  @uc: The user context of the current process passed into the trap handler
@@ -233,8 +249,6 @@ int Yalnix_Wait(int *status_ptr) {
  *   The process ID of the child to the parent on success
  *   ERROR to the parent on failure (without creating the child)
  */
-
-
 int Yalnix_Fork(UserContext *uc) {
   TracePrintf(1, "Start: Yalnix_Fork()\n");
 
