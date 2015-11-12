@@ -4,12 +4,13 @@
 #ifndef _LINKED_LIST_H_
 #define _LINKED_LIST_H_
 // Node data structure for linked lists
-typedef struct Node { 
+typedef struct ListNode ListNode;
+struct ListNode { 
   int id;
   void *data; 
-  struct Node *next; 
-  struct Node *prev;
-} ListNode;
+  ListNode *next; 
+  ListNode *prev;
+};
 
 // List data structure
 typedef struct List { 

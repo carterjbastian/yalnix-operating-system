@@ -8,11 +8,11 @@ typedef struct buffer {
 } buffer;
 
 
-typedef struct tty { 
+typedef struct TTY_t { 
   int id; 
   List *readers; 
   List *writers; 
   List *buffers;
-} tty;
+} TTY_t;
   
 #endif // _TTY_H_
