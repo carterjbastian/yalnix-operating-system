@@ -276,11 +276,11 @@ from one of the terminals attached to system.
 */
 void HANDLE_TRAP_TTY_RECEIVE(UserContext *uc) { 
 
-  TracePrintf(1, "Start: Handle_trap_tty_receive");
+  TracePrintf(1, "Start: Handle_trap_tty_receive\n");
   
   int id = uc->code; 
   ListNode *tty_node = find_by_id(ttys, id);
-  tty *tty = tty_node->data;
+  TTY_t *tty = tty_node->data;
   
   buffer *new_buf = (buffer *)malloc(sizeof(buffer));
   new_buf->buf = (buffer *)malloc(TERMINAL_MAX_LINE*sizeof(char));
@@ -292,13 +292,14 @@ void HANDLE_TRAP_TTY_RECEIVE(UserContext *uc) {
   // if a reader is waiting, let's wake him/her up:
   List *readers = tty->readers;
   ListNode *waiter_node = pop(readers);
-  PCB_t *waiter = waiter_node->data; 
-  if (waiter) { 
+  PCB_t *waiter;
+  if (waiter_node) { 
+    waiter = waiter_node->data;
     remove_from_list(tty->readers, waiter);
     add_to_list(ready_procs, waiter, 0);
   } 
 
-  TracePrintf(1, "End: Handle_trap_tty_receive");
+  TracePrintf(1, "End: Handle_trap_tty_receive\n");
 } 
 
 /* 
@@ -309,17 +310,19 @@ on a TtyTransmit) has been completely sent to terminal.
 */
 void HANDLE_TRAP_TTY_TRANSMIT(UserContext *uc) { 
 
-  TracePrintf(1, "Start: Handle_trap_tty_transmit");
+  TracePrintf(1, "Start: Handle_trap_tty_transmit\n");
   
   int id = uc->code; 
   ListNode *tty_node = find_by_id(ttys, id);
-  tty *tty = tty_node->data;
+  TTY_t *tty = tty_node->data;
   
-  remove_from_list(tty->writers, curr_proc);
-  add_to_list(ready_procs, curr_proc, curr_proc->proc_id);
-  add_to_list(tty->buffers, curr_proc->write_buf, 0);
+  ListNode *writer_node = pop(tty->writers);
+  PCB_t *writer = writer_node->data;
+  
+  add_to_list(ready_procs, writer, writer->proc_id);
+  add_to_list(tty->buffers, writer->write_buf, 0);
 
-  TracePrintf(1, "End: Handle_trap_tty_transmit");
+  TracePrintf(1, "End: Handle_trap_tty_transmit\n");
 } 
 
 void HANDLE_TRAP_DISK(UserContext *uc) {

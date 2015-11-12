@@ -99,7 +99,24 @@ void KernelStart(char *cmd_args[],
   all_procs = (List *)malloc( sizeof(List) ); 
   dead_procs = (List *)malloc( sizeof(List) ); 
 
-  // Create the list of empty frames
+  /*
+   * =========================================
+   *    Create additional data structs 
+   *    ( buffers, (todo: locks, cvars, pipes))
+   * =========================================
+   */
+  ttys = (List *)malloc( sizeof(List) );
+  for (i = 0; i < NUM_TERMINALS; i++) { 
+    TTY_t *tmp = (TTY_t *)malloc( sizeof(TTY_t) );
+    tmp->buffers = (List *)malloc( sizeof(List) );
+    tmp->writers = (List *)malloc( sizeof(List) );
+    tmp->readers = (List *)malloc( sizeof(List) );
+    tmp->id = i;
+    add_to_list(ttys, (void *)tmp, i); 
+  }
+  
+
+// Create the list of empty frames
     // NOTE: in FrameList, the number of the physical frame is
     //      stored in the id field of the node, NOT data.
   for (i = pframes_in_kernel; i < total_pframes; i++)
@@ -221,22 +238,8 @@ void KernelStart(char *cmd_args[],
 
   // Copy over idle's region 1 page table
   memcpy((void *)idle_proc->region1_pt, (void *) r1_pagetable, VMEM_1_PAGE_COUNT * sizeof(struct pte));
-  
 
-  /*
-   * =========================================
-   *    Create additional data structs 
-   *    ( buffers, (todo: locks, cvars, pipes))
-   * =========================================
-   */
-  ttys = (List *)malloc( sizeof(List) );
-  for (i = 0; i < NUM_TERMINALS; i++) { 
-    tty *tty = malloc( sizeof(tty) );
-    tty->id = i;
-    add_to_list(ttys, tty, i); 
-  }
 
-  
   /*
    * =========================================
    *    Create the init process
@@ -307,6 +310,7 @@ void KernelStart(char *cmd_args[],
     // Load the program from the text file
     if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
       TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
+      
       // Is there more that needs to be done here?
     }
 
