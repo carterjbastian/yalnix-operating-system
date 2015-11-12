@@ -14,7 +14,7 @@ int main(int argc, char *argv[]) {
     char read_msg[10];
     size = sizeof(read_msg);
     TtyRead(2, read_msg, size);
-    TracePrintf(1, "\t===>Just read from terminal 1: %s.\n", read_msg);
+    TracePrintf(1, "\t===>Just read from terminal 2: %s.\n", read_msg);
   }
   
   TracePrintf(1, "\t===>End: tty.c.c\n");

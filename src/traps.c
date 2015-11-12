@@ -8,6 +8,7 @@
 #include "syscalls/syscalls.h"
 #include "kernel.h"
 #include "linked_list.h"
+#include "traps.h"
 
 // used by a couple different traps
 void abort_current_process(int exit_code, UserContext *uc) {
@@ -41,6 +42,7 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
   int tty_id;
   void *buf;
   int len;
+  int *stat_ptr;
 
   switch(uc->code) { 
       case YALNIX_FORK: 
@@ -57,6 +59,8 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_WAIT:
+        stat_ptr = (int *) uc->regs[0];
+        retval = Yalnix_Wait(stat_ptr, uc);
         break;
 
       case YALNIX_GETPID:
@@ -115,29 +119,25 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
   if (count_items(blocked_procs) > 0) {
       ListNode *iterator = blocked_procs->first;
 
-
-    for (i = 0; i < count_items(blocked_procs); i++) { 
-        PCB_t *proc = iterator->data;
-        proc->delay_clock_ticks -= 1;
-        
-        if (proc->delay_clock_ticks <= 0) { 
-            add_to_list(ready_procs, proc, proc->proc_id);
-        }
-    } 
-    
     // Remove all the process that are no longer blocked from the blocked queue
     iterator = blocked_procs->first;
     while(iterator->next != NULL) {
         PCB_t *data = iterator->data;
         iterator = iterator->next;
 
-        if (data->delay_clock_ticks <= 0)
-            remove_from_list(blocked_procs, data);
+        // NOTE: This call to check_block auto-decrements the delay count
+        if (check_block(data->block) == UNBLOCKED) {
+          // Remove it from the blocked queue and add it to ready queue
+          remove_from_list(blocked_procs, data);
+          add_to_list(ready_procs, data, data->proc_id);
+        }
     }
 
     // Check the last item in the list
-    if (((PCB_t *)iterator->data)->delay_clock_ticks <= 0) {
-      remove_from_list(blocked_procs, iterator->data);
+    if (check_block(((PCB_t *)iterator->data)->block) == UNBLOCKED) {
+      PCB_t *data = (PCB_t *) iterator->data;
+      remove_from_list(blocked_procs, data);
+      add_to_list(ready_procs, data, data->proc_id);
     } 
   }
 

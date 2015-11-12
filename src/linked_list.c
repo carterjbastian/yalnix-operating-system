@@ -75,6 +75,9 @@ ListNode* pop(List *list) {
 int count_items(List *list) { 
   int count = 0;
 
+  if (list->first == NULL)
+    return count;
+
   ListNode *node = list->first;
 
   while (node) { 

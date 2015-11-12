@@ -2,7 +2,7 @@
 #define _PCB_H_
 #include "linked_list.h"
 #include "tty.h"
-//#include "PageTable.h"
+#include "blocks.h"
 
 /*
  * Type Definitions and Structures
@@ -12,7 +12,7 @@ typedef struct PCB_t {
   unsigned int proc_id;
   UserContext *uc;      // Be sure to copy in Fork 
   KernelContext *kc_p;
-
+  block_t *block;
 
   // Must be allocted when creating the process
   struct pte *region0_pt;
@@ -22,7 +22,7 @@ typedef struct PCB_t {
   List *children;         // Allocate in Fork
   List *exited_children;  // Allocate in Fork
   struct PCB_t *parent;          // A pointer to this process' parent
-  int delay_clock_ticks;  // Set upon delay
+//  int delay_clock_ticks;  // Set upon delay
   int heap_base_page;
   unsigned int brk_addr;
   int kc_set;             // Set to 1 after a MyKCSClone call
