@@ -118,23 +118,23 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
       case YALNIX_LOCK_RELEASE:
         retval = Yalnix_Release((int)uc->regs[0]);
         break;
-        /*
+
       case YALNIX_PIPE_INIT:
-        retval = Yalnix_PipeRead((int*)uc->regs[0]);
+        retval = Yalnix_PipeInit((int*)uc->regs[0]);
         break;
 
       case YALNIX_PIPE_READ:
-        retval = Yalnix_PipeRead((int*)uc->regs[0]);
+        retval = Yalnix_PipeRead((int)uc->regs[0], (void *)uc->regs[1], (int)uc->regs[2]);
         break;
 
       case YALNIX_PIPE_WRITE:
-        retval = Yalnix_PipeWrite((int*)uc->regs[0]);
+        retval = Yalnix_PipeWrite((int)uc->regs[0], (void *)uc->regs[1], (int)uc->regs[2]);
         break;
-        */
+/*
       case YALNIX_RECLAIM:
         retval = Yalnix_Reclaim((int)uc->regs[0]);
         break;        
-
+*/
       default:
         TracePrintf(3, "Unrecognized syscall: %d\n", uc->code);
         break;

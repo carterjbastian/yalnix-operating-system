@@ -14,7 +14,7 @@
 #include "PCB.h"
 #include "syscalls.h"
 #include "blocks.h"
-
+#include "pipe.h"
 /*
  * Function: Yalnix_Wait
  *  @status_ptr: A pointer to an integer to hold the child's return status
@@ -1032,17 +1032,160 @@ int Yalnix_Release(int lock_id) {
   return SUCCESS;
 } 
 
+/*
+ * Yalnix_PipeInit
+ *  @pip_idp Pointer to the int that will hold the pipe's identifier
+ *
+ * TO DO:
+ *  - Check that we haven't exhausted all of the resource identifiers
+ */
+int Yalnix_PipeInit(int *pip_idp) {
+  TracePrintf(1, "Starting: Yalnix_PipeInit\n");
+  // Local Variables
+  pipe_t *pipe;
 
-int Yalnix_PipeInit(int *pip_idp) { 
+  // Allocate space for a new Pipe
+  pipe = (pipe_t *) malloc( sizeof(pipe_t) );
+  if (pipe == NULL)
+    return ERROR;
+  
+  pipe->buf = (char *) malloc( sizeof(char) * MAX_PIPE_LEN );
+  if (pipe->buf == NULL) {
+    free(pipe);
+    return ERROR;
+  }
 
+  pipe->waiters = (List *) malloc( sizeof(List) );
+  if (pipe->waiters == NULL) {
+    free(pipe->buf);
+    free(pipe);
+    return ERROR;
+  }
+
+  // Initialize the new pipe to be empty
+  // TO DO: Check if we've reached the max resource count
+  pipe->id = next_resource_id++;
+  pipe->len = 0;
+  pipe->waiters->first = NULL;
+  bzero(pipe->buf, sizeof(char) * MAX_PIPE_LEN);
+
+  // Add the new pipe to the list of pipes
+  add_to_list(pipes, (void *)pipe, pipe->id);
+
+  // Copy the pipe identifier into the userland variable
+  *pip_idp = pipe->id;
+
+  TracePrintf(1, "Finishing: Yalnix_PipeInit\n");
+  return SUCCESS;
 } 
 
-int Yalnix_PipeRead(int pipe_id, void *buf, int len) { 
+/*
+ * Function: Yalnix_PipeRead
+ *  @pipe_id
+ *  @buf
+ *  @len
+ *
+ * Description:
+ *
+ * To Do:
+ *
+ */
+int Yalnix_PipeRead(int pipe_id, void *buf, int len) {
+  TracePrintf(1, "Starting: Yalnix_PipeRead\n");
+  // Local variables
+  ListNode *pipe_node;
+  pipe_t *pipe = NULL;
 
+  // Check that the pipe exists
+  pipe_node = find_by_id(pipes, pipe_id);
+
+  if (pipe_node)
+    pipe = pipe_node->data;
+
+  if (!pipe)
+    return(ERROR);
+
+  // Check the validity of the number of characters to read from the pipe
+  if (len > MAX_PIPE_LEN)
+    return(ERROR);
+
+  // If there are not len characters to read, block until there is
+  if (len > pipe->len) {
+    // Note that it's id in the list is the number of characters it needs
+    add_to_list(pipe->waiters, (void *) curr_proc, len);
+    switch_to_next_available_proc(curr_proc->uc, 0);
+  }
+
+  // When we get back here, we'll be able to do the read
+  memmove((void *)buf, (void *)pipe->buf, len);
+
+  // Shift the contents of the pipe's buffer down to the beginning
+  memmove((void *)pipe->buf, (void *)(pipe->buf + len), MAX_PIPE_LEN - len);
+  bzero(pipe->buf + (MAX_PIPE_LEN - len), len);
+
+  // Reset the index for the pipe
+  pipe->len -= len;
+
+  TracePrintf(1, "Finishing: Yalnix_PipeRead\n");
+  return(len);
 } 
 
+
+// BUGS: only works with one waiter at a time!
 int Yalnix_PipeWrite(int pipe_id, void *buf, int len) { 
+  TracePrintf(1, "Starting: Yalnix_PipeWrite\n");
+  // Local varialbes
+  ListNode *pipe_node;
+  pipe_t *pipe = NULL;
+  ListNode *waiter_node;
+  PCB_t *waiter_proc;
+  int required_len;
+  
 
+  // Check that the pipe exists
+  pipe_node = find_by_id(pipes, pipe_id);
+
+  if (pipe_node)
+    pipe = pipe_node->data;
+
+  if (!pipe)
+    return(ERROR);
+
+  // Check the validity of len parameter
+  //   Can't write more to the pipe than the space we have left
+  if (len > (MAX_PIPE_LEN - pipe->len))
+    return(ERROR);
+
+  // Copy the characters in and update the pipe's index
+  memmove((void *)(pipe->buf + pipe->len), (void *)buf, len);
+  pipe->len += len;
+  
+  // Take the next waiter off of the list of waiters if possible
+  waiter_proc = NULL;
+  // TO DO: Change this to be a non-removing version of pop!
+  waiter_node = pop(pipe->waiters);
+  
+  if (waiter_node)
+    waiter_proc = (PCB_t *) waiter_node->data;
+
+  // Check to see if this waiter should be kept on the list or put back on to
+  // waiters
+  if (waiter_proc) {
+    required_len = waiter_node->id;
+
+    if (required_len > pipe->len) {
+      // Put it back on the wait list
+      add_to_list(pipe->waiters, (void *)waiter_proc, required_len);
+    } else { // Put it on the ready queue
+      add_to_list(ready_procs, (void *)waiter_proc, waiter_proc->proc_id);
+    }
+
+    // Free the waiter_node returned from pop
+    free(waiter_node);
+  }
+
+  TracePrintf(1, "Finishing: Yalnix_PipeWrite\n");
+  return len;
 } 
 
 // if this function is called and processes

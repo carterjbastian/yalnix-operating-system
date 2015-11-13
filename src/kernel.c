@@ -118,7 +118,7 @@ void KernelStart(char *cmd_args[],
   next_resource_id = 0;
   locks = (List *)malloc( sizeof(List) );
   cvars = (List *)malloc( sizeof(List) );
-  
+  pipes = (List *)malloc( sizeof(List) );
 
 // Create the list of empty frames
     // NOTE: in FrameList, the number of the physical frame is
