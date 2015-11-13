@@ -877,7 +877,7 @@ int Yalnix_TtyRead(int tty_id, void *buf, int len) {
 }
 
 int Yalnix_CvarInit(int *cvar_idp) { 
-  
+  TracePrintf(1, "Starting: Yalnix_CvarInit\n");  
   // todo: return ERROR if 
   // validate (cvar_idp) == false
 
@@ -890,11 +890,12 @@ int Yalnix_CvarInit(int *cvar_idp) {
 
   add_to_list(cvars, cvar, cvar->id);
 
+  TracePrintf(1, "Finishing: Yalnix_CvarInit\n");
   return SUCCESS;
 } 
 
 int Yalnix_CvarSignal(int cvar_id) { 
-  
+  TracePrintf(1, "Starting: Yalnix_CvarSignal\n");
   ListNode *cvar_node = find_by_id(cvars, cvar_id);
   if (!cvar_node) { 
     return ERROR;
@@ -910,12 +911,12 @@ int Yalnix_CvarSignal(int cvar_id) {
 
   PCB_t *waiter = waiter_node->data;
   add_to_list(ready_procs, waiter, waiter->proc_id);
-  
+   TracePrintf(1, "Finishing: Yalnix_CvarSignal\n");
   return SUCCESS;
 } 
 
 int Yalnix_CvarBroadcast(int cvar_id)  {
-
+  TracePrintf(1, "Starting: Yalnix_CvarBroadcast\n");
   ListNode *cvar_node = find_by_id(cvars, cvar_id);
   if (!cvar_node) { 
     return ERROR;
@@ -924,16 +925,18 @@ int Yalnix_CvarBroadcast(int cvar_id)  {
   CVAR_t *cvar = cvar_node->data;
   
   ListNode *waiter_node = pop(cvar->waiters);
+
   while(waiter_node) { 
     PCB_t *waiter = waiter_node->data;
     add_to_list(ready_procs, waiter, waiter->proc_id);
+    waiter_node = waiter_node->next;
   } 
-  
+  TracePrintf(1, "Finishing: Yalnix_CvarBroadcast\n"); 
   return SUCCESS;
 } 
 
 int Yalnix_CvarWait(int cvar_id, int lock_id) { 
-
+  TracePrintf(1, "Starting: Yalnix_CvarWait\n");
   ListNode *cvar_node = find_by_id(cvars, cvar_id);
   if (!cvar_node) { 
     return ERROR;
@@ -952,6 +955,7 @@ int Yalnix_CvarWait(int cvar_id, int lock_id) {
   switch_to_next_available_proc(curr_proc->uc, 0);
 
   Yalnix_Acquire(lock->id);
+  TracePrintf(1, "Finishing: Yalnix_CvarWait\n");
 }
 
 

@@ -1,7 +1,7 @@
+int global = 0;
 
 int main(int argc, char*argv[]) { 
   
-  int global = 0;
   TracePrintf(1, "Start: locks_cvars.c\n");
 
   int rc; 
@@ -104,7 +104,8 @@ int main(int argc, char*argv[]) {
         TracePrintf(1, "P4 set global = %d\n", global);
         TracePrintf(1, "P4 signaled, now releasing lock\n");
         Release(lock_id);
-              
+        Pause();
+        Exit(400);        
       } else { 
       
         // P3 
@@ -123,6 +124,8 @@ int main(int argc, char*argv[]) {
         Release(lock_id);
         int status;
         Wait(&status);
+        Pause();
+        Exit(300);
       }
       
     } else { 
@@ -143,6 +146,8 @@ int main(int argc, char*argv[]) {
       Release(lock_id);
       int status;
       Wait(&status);
+      Pause();
+      Exit(200);
     } 
     
   } else { 
@@ -161,7 +166,7 @@ int main(int argc, char*argv[]) {
     Release(lock_id);
     int status;
     Wait(&status);
-    TracePrintf(1, "P1 got exit code of p@: %d\n", status);
+    TracePrintf(1, "P1 got exit code of p2: %d\n", status);
   }
 
   TracePrintf(1, "Finished with cvar waiting... global = %d\n", global);
