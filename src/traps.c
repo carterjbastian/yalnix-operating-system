@@ -5,7 +5,7 @@
 #include <hardware.h>
 #include <yalnix.h>
 #include "tty.h"
-#include "syscalls/syscalls.h"
+#include "syscalls.h"
 #include "kernel.h"
 #include "linked_list.h"
 #include "traps.h"
@@ -90,6 +90,50 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         len = (int) uc->regs[2];
         retval = Yalnix_TtyRead(tty_id, buf, len);
         break;
+
+      case YALNIX_CVAR_INIT:
+        retval = Yalnix_CvarInit((int*)uc->regs[0]);
+        break;
+
+      case YALNIX_CVAR_SIGNAL:
+        retval = Yalnix_CvarSignal((int)uc->regs[0]);
+        break;
+
+      case YALNIX_CVAR_BROADCAST:
+        retval = Yalnix_CvarBroadcast((int)uc->regs[0]);
+        break;
+        
+      case YALNIX_CVAR_WAIT:
+        retval = Yalnix_CvarWait((int)uc->regs[0], (int)uc->regs[1]);
+        break;
+
+      case YALNIX_LOCK_INIT:
+        retval = Yalnix_LockInit((int*)uc->regs[0]);
+        break;
+    
+      case YALNIX_LOCK_ACQUIRE:
+        retval = Yalnix_Acquire((int)uc->regs[0]);
+        break;
+
+      case YALNIX_LOCK_RELEASE:
+        retval = Yalnix_Release((int)uc->regs[0]);
+        break;
+        /*
+      case YALNIX_PIPE_INIT:
+        retval = Yalnix_PipeRead((int*)uc->regs[0]);
+        break;
+
+      case YALNIX_PIPE_READ:
+        retval = Yalnix_PipeRead((int*)uc->regs[0]);
+        break;
+
+      case YALNIX_PIPE_WRITE:
+        retval = Yalnix_PipeWrite((int*)uc->regs[0]);
+        break;
+        */
+      case YALNIX_RECLAIM:
+        retval = Yalnix_Reclaim((int)uc->regs[0]);
+        break;        
 
       default:
         TracePrintf(3, "Unrecognized syscall: %d\n", uc->code);
@@ -298,6 +342,28 @@ void HANDLE_TRAP_TTY_RECEIVE(UserContext *uc) {
     remove_from_list(tty->readers, waiter);
     add_to_list(ready_procs, waiter, 0);
   } 
+
+  /* 
+  // handle case if reader wants to read less than 
+  // what we have
+  if (strlen(stored_buf->buf) > len) {   
+    
+    int leftover_length = strlen(stored_buf->buf) - len;
+    char* leftover_char_buf;
+    strncpy(leftover_char_buf, stored_buf->buf + len, leftover_length);
+    buffer *leftover_buf = malloc(sizeof(buffer));
+    leftover_buf->len = leftover_length;
+    leftover_buf->buf = leftover_char_buf;
+    add_to_list(tty->buffers, leftover_buf, 0);
+    
+  } else { 
+    
+    // only copy len chars, don't "overcopy"
+    if (strlen(stored_buf->buf) < len) { 
+      len = strlen(stored_buf->buf);
+    }
+  }
+  */
 
   TracePrintf(1, "End: Handle_trap_tty_receive\n");
 } 

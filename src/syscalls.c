@@ -3,12 +3,15 @@
  */
 #include <hardware.h>
 #include <string.h>
-#include "../tty.h"
+#include "tty.h"
+#include "cvar.h"
+#include "lock.h"
+
 /*
  * Local Includes
  */
-#include "../kernel.h"
-#include "../PCB.h"
+#include "kernel.h"
+#include "PCB.h"
 #include "syscalls.h"
 #include "../blocks.h"
 
@@ -804,11 +807,6 @@ int Yalnix_Delay(UserContext *uc, int clock_ticks) {
   return SUCCESS;
 } 
 
-int Yalnix_Reclaim(int id) { 
-  // for lock/cvar/pipe in locks + cvars + pipes
-  //   destory_and_release(item with id == id)
-} 
-
 int Yalnix_TtyWrite(int tty_id, void *buf, int len) { 
 
   TracePrintf(1, "Start: TtyWrite\n");
@@ -826,12 +824,12 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
 
   // now we put ourselves on list of writers and start writing
   add_to_list(tty->writers, curr_proc, curr_proc->proc_id);
+  
   TtyTransmit(tty_id, buf, len); 
 
   // we've returned from transmit, but aren't finished writing. 
   // so switch to another proc until we're done
   switch_to_next_available_proc(curr_proc->uc, 0);
-  
 
   TracePrintf(1, "End: TtyWrite\n");
   return len;
@@ -870,9 +868,184 @@ int Yalnix_TtyRead(int tty_id, void *buf, int len) {
     TracePrintf(3, "Something went wrong in TtyRead..\n");
     return ERROR;
   }
-  
+
   memcpy(buf, stored_buf->buf, len*sizeof(char));  
   
   TracePrintf(1, "End: TtyRead\n");
   return len;
 }
+
+int Yalnix_CvarInit(int *cvar_idp) { 
+  
+  // todo: return ERROR if 
+  // validate (cvar_idp) == false
+
+  CVAR_t *cvar = (CVAR_t*)malloc(sizeof(CVAR_t));
+  cvar->id = next_resource_id;
+  next_resource_id++;
+  cvar->waiters = (List*)malloc( sizeof(List) );
+  
+  *cvar_idp = cvar->id;
+
+  add_to_list(cvars, cvar, cvar->id);
+
+  return SUCCESS;
+} 
+
+int Yalnix_CvarSignal(int cvar_id) { 
+  
+  ListNode *cvar_node = find_by_id(cvars, cvar_id);
+  if (!cvar_node) { 
+    return ERROR;
+  } 
+
+  CVAR_t *cvar = cvar_node->data;
+  ListNode *waiter_node = pop(cvar->waiters);
+
+  // if no waiters, do nothing.
+  if (!waiter_node) {
+    return SUCCESS;
+  } 
+
+  PCB_t *waiter = waiter_node->data;
+  add_to_list(ready_procs, waiter, waiter->proc_id);
+  
+  return SUCCESS;
+} 
+
+int Yalnix_CvarBroadcast(int cvar_id)  {
+
+  ListNode *cvar_node = find_by_id(cvars, cvar_id);
+  if (!cvar_node) { 
+    return ERROR;
+  } 
+  
+  CVAR_t *cvar = cvar_node->data;
+  
+  ListNode *waiter_node = pop(cvar->waiters);
+  while(waiter_node) { 
+    PCB_t *waiter = waiter_node->data;
+    add_to_list(ready_procs, waiter, waiter->proc_id);
+  } 
+  
+  return SUCCESS;
+} 
+
+int Yalnix_CvarWait(int cvar_id, int lock_id) { 
+
+  ListNode *cvar_node = find_by_id(cvars, cvar_id);
+  if (!cvar_node) { 
+    return ERROR;
+  }   
+  CVAR_t *cvar = cvar_node->data;
+  
+  ListNode *lock_node = find_by_id(locks, lock_id);
+  if (!lock_node) { 
+    return ERROR;
+  } 
+  LOCK_t *lock = lock_node->data;
+  
+  Yalnix_Release(lock->id);
+  
+  add_to_list(cvar->waiters, curr_proc, curr_proc->proc_id);
+  switch_to_next_available_proc(curr_proc->uc, 0);
+
+  Yalnix_Acquire(lock->id);
+}
+
+
+int Yalnix_LockInit(int *lock_idp) { 
+  
+  // todo: return ERROR if 
+  // validate (lock_idp) == false
+  
+  LOCK_t *lock = (LOCK_t *)malloc(sizeof(LOCK_t));
+  lock->id = next_resource_id;
+  next_resource_id++;
+  lock->is_claimed = 0;
+  lock->owner_id = -1;
+  lock->waiters = (List*)malloc( sizeof(List) );
+
+  *lock_idp = lock->id;
+
+  add_to_list(locks, lock, lock->id);
+
+  return SUCCESS;
+} 
+
+int Yalnix_Acquire(int lock_id) { 
+  ListNode *lock_node = find_by_id(locks, lock_id);
+  if (!lock_node) { 
+    return ERROR;
+  } 
+  LOCK_t *lock = lock_node->data;
+  
+  if (lock->owner_id == curr_proc->proc_id) { 
+    return SUCCESS;
+  } 
+
+  if (!lock->is_claimed) { 
+    lock->is_claimed = 1;
+    lock->owner_id = curr_proc->proc_id;
+    return SUCCESS;
+  } 
+  
+  add_to_list(lock->waiters, curr_proc, curr_proc->proc_id);
+  switch_to_next_available_proc(curr_proc->uc, 0);
+ 
+  // when we return from the above, we'll have the lock! 
+  // (it's given to us in release) 
+
+  return SUCCESS;
+  
+} 
+
+int Yalnix_Release(int lock_id) { 
+  ListNode *lock_node = find_by_id(locks, lock_id);
+  if (!lock_node) { 
+    return ERROR;
+  } 
+  LOCK_t *lock = lock_node->data;
+  
+  if (!lock->is_claimed || lock->owner_id != curr_proc->proc_id) { 
+    return ERROR;
+  }
+  
+  ListNode *waiter_node = pop(lock->waiters);
+  PCB_t *waiter;
+  if (waiter_node) {
+    waiter = waiter_node->data;
+  }
+  
+  if (!waiter) { 
+    lock->is_claimed = 0;
+    lock->owner_id = -1;
+    return SUCCESS;
+  } 
+
+  // else, there's a waiter, so let's give them the lock 
+  // and let them wake up (add to ready_procs)
+  lock->owner_id = waiter->proc_id;
+  add_to_list(ready_procs, waiter, waiter->proc_id);
+  
+  return SUCCESS;
+} 
+
+
+int Yalnix_PipeInit(int *pip_idp) { 
+
+} 
+
+int Yalnix_PipeRead(int pipe_id, void *buf, int len) { 
+
+} 
+
+int Yalnix_PipeWrite(int pipe_id, void *buf, int len) { 
+
+} 
+
+// if this function is called and processes
+// are waiting on the resource, they will continue waiting...
+int Yalnix_Reclaim(int id) { 
+  
+} 
