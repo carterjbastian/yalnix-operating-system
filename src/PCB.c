@@ -11,7 +11,7 @@
 #include "tty.h"
 #include "PCB.h"
 #include "kernel.h"
-
+#include "blocks.h"
 
 PCB_t *new_process(UserContext *uc) {   
   TracePrintf(1, "Start: new_process\n");
@@ -20,10 +20,14 @@ PCB_t *new_process(UserContext *uc) {
   PCB_t *pcb = (PCB_t *) malloc( sizeof(PCB_t) );
   
   // Allocate a new UserContext for the PCB
-  pcb->uc = (UserContext *)malloc( sizeof(UserContext) );
+  pcb->uc = (UserContext *) malloc( sizeof(UserContext) );
 
   // Allocate a new KernelContext for the PCB
-  pcb->kc_p = (KernelContext *)malloc(sizeof(KernelContext));
+  pcb->kc_p = (KernelContext *) malloc(sizeof(KernelContext));
+
+  // Allocate a new Block for the PCB
+  pcb->block = (block_t *) malloc( sizeof(block_t) );
+  bzero((char *)pcb->block, sizeof(block_t) );
 
   // UserContext inherits the vector and code from 
   pcb->uc->vector = uc->vector;
@@ -36,7 +40,7 @@ PCB_t *new_process(UserContext *uc) {
   pcb->children = NULL;
   pcb->exited_children = NULL;
   pcb->parent = NULL;
-  pcb->delay_clock_ticks = 0;
+//  pcb->delay_clock_ticks = 0;
   pcb->heap_base_page = 0;
   pcb->brk_addr = 0;
   pcb->kc_set = 0;

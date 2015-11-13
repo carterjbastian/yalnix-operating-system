@@ -14,14 +14,15 @@ int main(int argc, char *argv[]) {
     pid = GetPid();
     TracePrintf(1, "\t\tIn CHILD loop, PID = %d\n", pid);
     for (i = 0; i < 5; i++) {
-      TracePrintf(1, "\t\tCHILD: iteration %d\n");
+      TracePrintf(1, "\t\tCHILD: iteration %d\n", i);
       Pause();
     }
     TracePrintf(1, "\t\tCHILD: looping done, now exiting.\n");
     Exit(rc);
   } else {
-    TracePrintf(1, "\t\tIn PARENT loop, PID = %d, CHILD PID = %d\n", pid, rc);
+
     for (i = 0; i < 10; i++) {
+      TracePrintf(1, "\t\tIn PARENT loop, PID = %d, CHILD PID = %d\n", pid, rc);
       TracePrintf(1, "\t\tPARENT: iteration %d\n", i);
       Pause();
     }

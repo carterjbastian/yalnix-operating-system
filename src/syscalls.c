@@ -13,6 +13,7 @@
 #include "kernel.h"
 #include "PCB.h"
 #include "syscalls.h"
+#include "../blocks.h"
 
 /*
  * Function: Yalnix_Wait
@@ -25,11 +26,125 @@
  * Returns either the PID of the child that exited or ERROR.
  *
  * ToDo:
+ *    - Clean this all up. It's messy.
+ *    - Document better.
  *
  */
-int Yalnix_Wait(int *status_ptr) { 
-  // empty exited_children
-  // switch to another available process
+int Yalnix_Wait(int *status_ptr, UserContext *uc) { 
+  TracePrintf(1, "Starting: Yalnix_Wait\n");
+  /* Local Variables */
+  int block_retval;
+  PCB_t *parent;
+  PCB_t *returning_child;
+  int ret_child_pid;
+  ListNode *found_item;
+  void *data_ptr;
+
+  /* Check that the process has children */
+  parent = curr_proc;
+  if (parent->children == NULL) {
+    TracePrintf(3, "Process %d tried to call Wait without ever having children\n", parent->proc_id);
+    return(ERROR);
+  }
+
+  if (parent->exited_children == NULL) {
+    if (count_items(parent->children) <= 0) {
+      TracePrintf(3, "Process %d has no active or dead children on which to wait\n", parent->proc_id);
+      return(ERROR);
+    }
+  } else {
+    if (count_items(parent->children) <= 0 && 
+        count_items(parent->exited_children) <= 0) {
+      TracePrintf(3, "Process %d has no active or dead children on which to call wait\n", parent->proc_id);
+      return(ERROR);
+    }
+  }
+
+  /* Check if any of the process' children have exited already */
+  if (parent->exited_children != NULL && count_items(parent->exited_children) > 0) {
+    TracePrintf(1, "Wait found a child process already exited!\n");
+    // Remove exited child from list and get its id
+    ret_child_pid = (pop(parent->exited_children))->id;
+
+    // Find this in the dead_proc global list to retreive its return info
+    found_item = find_by_id(dead_procs, ret_child_pid);
+    if (found_item == NULL) {
+      TracePrintf(3, "Exited child was found but not in the dead procs global list\n");
+      return(ERROR);
+    }
+
+    // Copy the return info into the integer pointer passed into this call
+    data_ptr = found_item->data;
+
+    if (data_ptr == NULL) {
+      TracePrintf(3, "Exited child had null status pointer\n");
+      return(ERROR);
+    }
+
+    // Copy the return value and clean up unused info
+    *status_ptr = *((int *) data_ptr);
+    remove_from_list(dead_procs, data_ptr);
+    free(data_ptr);
+    
+    // Return the pid of the returning child
+    return(ret_child_pid);
+  }
+
+  /* Otherwise, set up the block to represent a wait call */
+  bzero((char *) parent->block, sizeof(block_t)); // Just in case
+  parent->block->active = BLOCK_ACTIVE;
+  parent->block->type = WAIT_BLOCK;
+  // The obj_ptr field gets a pointer to the blocking process
+  parent->block->obj_ptr = (void *)parent;
+
+  /* Update Kernel globals */
+  add_to_list(blocked_procs, parent, parent->proc_id);
+
+  /* Switch to the next avaialble process */
+  if (count_items(ready_procs) <= 0) {
+      TracePrintf(3, "No Items on the ready queue to switch to.\n");
+      exit(ERROR);
+  } else {
+    if (switch_to_next_available_proc(uc, 0) != SUCCESS) {
+      TracePrintf(3, "Failed to switch to the next process\n");
+      exit(ERROR);
+    }
+  }
+
+  /* Having returned from being blocked, collect info and return */
+  TracePrintf(1, "Wait found a child process after blocking!\n");
+  // Double check that this all worked correctly
+  if (count_items(parent->exited_children) <= 0) {
+    TracePrintf(3, "Wait returned after blocking incorrectly\n");
+    return(ERROR);
+  }
+
+  // Remove exited child from list and get its id
+  ret_child_pid = (pop(parent->exited_children))->id;
+
+  // Find this in the dead_proc global list to retreive its return info
+  found_item = find_by_id(dead_procs, ret_child_pid);
+  if (found_item == NULL) {
+    TracePrintf(3, "Exited child was found but not in the dead procs global list\n");
+    return(ERROR);
+  }
+
+  // Copy the return info into the integer pointer passed into this call
+  data_ptr = found_item->data;
+
+  if (data_ptr == NULL) {
+    TracePrintf(3, "Exited child had null status pointer\n");
+    return(ERROR);
+  }
+
+  // Copy the return value and clean up unused info
+  *status_ptr = *((int *) data_ptr);
+  remove_from_list(dead_procs, data_ptr);
+  free(data_ptr);
+    
+  // Return the pid of the returning child
+  return(ret_child_pid);
+  TracePrintf(1, "Done: Yalnix_Wait");
 }
 
 
@@ -135,7 +250,9 @@ void Yalnix_Exit(int status, UserContext *uc) {
       if (temp_node == NULL) {        // Does find_by_id return NULL?
         TracePrintf(3, "Couldn't find the exited child (PID = %d) in global list\n", child_pid);
       } else {
-        remove_from_list(dead_procs, temp_node->data);
+        void *dead_stat_ptr = temp_node->data;
+        remove_from_list(dead_procs, dead_stat_ptr);
+        free(dead_stat_ptr);
       }
     }
     // TO-DO: Recycle child_pid
@@ -671,13 +788,17 @@ int Yalnix_Delay(UserContext *uc, int clock_ticks) {
   if (clock_ticks < 0) return ERROR;
   if (clock_ticks == 0) return SUCCESS;
 
+  // Set up the process' block to represent a delay
+  curr_proc->block->active = BLOCK_ACTIVE;
+  curr_proc->block->type = DELAY_BLOCK;
+  curr_proc->block->data.delay_count = clock_ticks;
+
   // Add this process to the list of blocked processes
   add_to_list(blocked_procs, curr_proc, curr_proc->proc_id);
-  curr_proc->delay_clock_ticks = clock_ticks;
 
   if (count_items(ready_procs) <= 0) {
     TracePrintf(3, "No Items on the Ready queue to switch to!\n");
-    // crash here?
+    exit(ERROR);
   } else {
     if (switch_to_next_available_proc(uc, 0) != SUCCESS)
         TracePrintf(3, "Switch to next available process failed\n");

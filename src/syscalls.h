@@ -10,7 +10,7 @@ int Yalnix_Exec(UserContext *uc);
 
 void Yalnix_Exit(int status, UserContext *uc);
 
-int Yalnix_Wait(int *status_ptr);
+int Yalnix_Wait(int *status_ptr, UserContext *uc);
 
 int Yalnix_GetPid();
 
