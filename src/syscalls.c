@@ -13,7 +13,7 @@
 #include "kernel.h"
 #include "PCB.h"
 #include "syscalls.h"
-#include "../blocks.h"
+#include "blocks.h"
 
 /*
  * Function: Yalnix_Wait
