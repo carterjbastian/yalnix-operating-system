@@ -1013,7 +1013,7 @@ int Yalnix_Release(int lock_id) {
   }
   
   ListNode *waiter_node = pop(lock->waiters);
-  PCB_t *waiter;
+  PCB_t *waiter = NULL;
   if (waiter_node) {
     waiter = waiter_node->data;
   }

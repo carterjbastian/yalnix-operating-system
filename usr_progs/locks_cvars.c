@@ -60,6 +60,7 @@ int main(int argc, char*argv[]) {
       Release(lock_id);
       int status;
       Wait(&status);
+      TracePrintf(1, "P2 got exit code of P3: %d\n", status);
       Exit(200);
 
     }  
@@ -74,6 +75,7 @@ int main(int argc, char*argv[]) {
     Release(lock_id);
     int status;
     Wait(&status);
+    TracePrintf(1, "P1 got exit code of P2: %d\n", status);
   } 
   
   TracePrintf(1, "Finished Testing Locks\n", rc);
