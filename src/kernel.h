@@ -46,7 +46,8 @@ unsigned int pframes_in_use;
 unsigned int pframes_in_kernel;
 
 
-// locks/cvars/pipes
+// locks/cvars/pipes/ttys
+int next_resource_id;
 List *locks;
 List *cvars;
 List *pipes;
