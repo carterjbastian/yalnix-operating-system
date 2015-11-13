@@ -176,7 +176,7 @@ void HANDLE_TRAP_CLOCK(UserContext *uc) {
           add_to_list(ready_procs, data, data->proc_id);
         }
     }
-
+    
     // Check the last item in the list
     if (check_block(((PCB_t *)iterator->data)->block) == UNBLOCKED) {
       PCB_t *data = (PCB_t *) iterator->data;

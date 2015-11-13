@@ -1,6 +1,9 @@
+
+int global; 
+
 int main(int argc, char*argv[]) { 
   
-
+  global = 5;
   TracePrintf(1, "Start: locks_cvars.c\n");
 
   int rc; 
@@ -37,38 +40,45 @@ int main(int argc, char*argv[]) {
     rc = Fork();
     if (rc == 0) { 
       
+      TracePrintf(1, "P3 trying to acquire lock\n");
       Acquire(lock_id);
-      TracePrintf(1, "Grandchild has lock - sleeping now\n");
+      TracePrintf(1, "P3 has lock - sleeping now\n");
       Pause();
       Pause();
-      TracePrintf(1, "Grandchild done work - releasing lock\n");
+      TracePrintf(1, "P3 done work - releasing lock\n");
       Release(lock_id);
+      Exit(100);
 
     } else { 
 
+      TracePrintf(1, "P2 trying to acquire lock\n");
       Acquire(lock_id);
-      TracePrintf(1, "Child has lock - sleeping now\n");
+      TracePrintf(1, "P2 has lock - sleeping now\n");
       Pause();
       Pause();
-      TracePrintf(1, "Child done work - releasing lock\n");
+      TracePrintf(1, "P2 done work - releasing lock\n");
       Release(lock_id);
+      int status;
+      Wait(&status);
+      Exit(200);
 
     }  
     
   } else { 
     
+    TracePrintf(1, "P1 trying to acquire lock\n");
     Acquire(lock_id);
-    TracePrintf(1, "Grandparent has lock - sleeping now\n");
+    TracePrintf(1, "P1 has lock - sleeping now\n");
     Pause();
-    TracePrintf(1, "Grandparent done work - releasing lock\n");
+    TracePrintf(1, "P1 done work - releasing lock\n");
     Release(lock_id);
-    
+    int status;
+    Wait(&status);
   } 
   
-  
-  TracePrintf(1, "End: locks_cvars.c\n", rc);      
-  // test cvars 
-  
+  TracePrintf(1, "Finished Testing Locks\n", rc);
+  // test cvars
+  return 0;
 }
 
 

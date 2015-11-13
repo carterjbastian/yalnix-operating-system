@@ -13,7 +13,7 @@
 #include "kernel.h"
 #include "PCB.h"
 #include "syscalls.h"
-#include "../blocks.h"
+#include "blocks.h"
 
 /*
  * Function: Yalnix_Wait
@@ -42,6 +42,7 @@ int Yalnix_Wait(int *status_ptr, UserContext *uc) {
 
   /* Check that the process has children */
   parent = curr_proc;
+  TracePrintf(1, "Waiting id: %d\n", curr_proc->proc_id);
   if (parent->children == NULL) {
     TracePrintf(3, "Process %d tried to call Wait without ever having children\n", parent->proc_id);
     return(ERROR);

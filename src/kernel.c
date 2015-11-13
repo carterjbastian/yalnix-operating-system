@@ -65,7 +65,7 @@ void KernelStart(char *cmd_args[],
   int base_frame_r1;                    // Lowest frame in region 1
   int top_frame_r1;                     // Highest frame in region 1
 
-  PCB_t *idle_proc;                     // An idle process (the parent proc)
+
   int idle_stack_fnum1;                 // Number of idle's 1st stack frame
   int idle_stack_fnum2;                 // Number of idle's 2nd stack frame
 
@@ -464,7 +464,7 @@ KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pc
  */
 int switch_to_next_available_proc(UserContext *uc, int should_run_again){ 
   TracePrintf(1, "Start: switch_to_next_available_proc \n");
-
+  
   // Put the old process on the ready queue if needed
   if (should_run_again) 
     add_to_list(ready_procs, (void *) curr_proc, curr_proc->proc_id);

@@ -54,6 +54,7 @@ List *pipes;
 List *ttys;
 
 // processes 
+PCB_t *idle_proc; 
 PCB_t *curr_proc;
 unsigned int available_process_id;
 unsigned int total_pframes;
