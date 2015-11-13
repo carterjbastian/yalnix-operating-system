@@ -85,12 +85,6 @@ int check_block(block_t *block) {
     case PIPE_BLOCK :
       break;
 
-    case LOCK_BLOCK :
-      break;
-
-    case CVAR_BLOCK :
-      break;
-
     case TTY_READ_BLOCK :
       break;
 
