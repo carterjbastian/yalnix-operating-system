@@ -85,4 +85,5 @@ void DoIdle();
 
 void *MyKCSClone(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p);
 KernelContext *MyKCSSwitch(KernelContext *kc_in, void *curr_pcb_p, void *next_pcb_p);
+int bufferIsValid(char *buff, int len, void* permissions);
 #endif // _KERNEL_H_

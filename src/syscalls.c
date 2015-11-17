@@ -862,6 +862,7 @@ int Yalnix_TtyRead(int tty_id, void *buf, int len) {
     // we just woke up, so now there should be a buff! 
     ListNode *node = pop(buffers);
     stored_buf = node->data;
+    free(node);
   } 
 
   // should be a sanity check... 
@@ -910,6 +911,7 @@ int Yalnix_CvarSignal(int cvar_id) {
   } 
 
   PCB_t *waiter = waiter_node->data;
+  free(waiter_node);
   add_to_list(ready_procs, waiter, waiter->proc_id);
    TracePrintf(1, "Finishing: Yalnix_CvarSignal\n");
   return SUCCESS;
@@ -1020,6 +1022,7 @@ int Yalnix_Release(int lock_id) {
   PCB_t *waiter = NULL;
   if (waiter_node) {
     waiter = waiter_node->data;
+    free(waiter_node);
   }
   
   if (!waiter) { 
@@ -1168,10 +1171,12 @@ int Yalnix_PipeWrite(int pipe_id, void *buf, int len) {
   waiter_proc = NULL;
   // TO DO: Change this to be a non-removing version of pop!
   waiter_node = pop(pipe->waiters);
-  
-  if (waiter_node)
+  int waiter_id;
+  if (waiter_node) { 
     waiter_proc = (PCB_t *) waiter_node->data;
-
+    waiter_id = waiter_node->id;
+    free(waiter_node);
+  }
   // Check to see if this waiter should be kept on the list or put back on to
   // waiters
   if (waiter_proc) {
@@ -1192,8 +1197,34 @@ int Yalnix_PipeWrite(int pipe_id, void *buf, int len) {
   return len;
 } 
 
-// if this function is called and processes
-// are waiting on the resource, they will continue waiting...
+/* 
+   Destory lock, condition variable, or piped identified by id
+   and release resources. 
+   If this function is called and processes
+   are waiting on the resource, they will continue waiting.
+   It's the user's job to handle it. 
+*/
 int Yalnix_Reclaim(int id) { 
+
+  ListNode *node; 
+  
+  if (node = find_by_id(locks, id)) { 
+    
+    remove_from_list(locks, node->data);
+    free(node);
+    
+  } else if (node = find_by_id(cvars, id)) { 
+    
+    remove_from_list(cvars, node->data);
+    free(node);
+    
+  } else if (node = find_by_id(pipes, id)) { 
+
+    remove_from_list(pipes, node->data);
+    free(node);
+    
+  } 
+  
+  return SUCCESS;
   
 } 
