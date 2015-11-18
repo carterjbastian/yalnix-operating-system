@@ -2,7 +2,14 @@
 #include <stdio.h>
 #include "linked_list.h"
 
-  // add data at end of last node 
+
+List *init_list() { 
+  List *list = malloc(sizeof(List));
+  list->first = NULL;
+  return list;
+}
+
+// add data at end of last node 
 void add_to_list(List *list, void *data, int id) { 
   ListNode *new = malloc( sizeof(ListNode) );
   new->data = data;
@@ -11,11 +18,12 @@ void add_to_list(List *list, void *data, int id) {
   new->next = NULL;
 
   ListNode *node = list->first;
+
   if (!node) { 
     list->first = new;
     return;
   } 
-
+  
   while (node->next) { 
     node = node->next;
   } 

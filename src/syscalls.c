@@ -65,7 +65,9 @@ int Yalnix_Wait(int *status_ptr, UserContext *uc) {
   if (parent->exited_children != NULL && count_items(parent->exited_children) > 0) {
     TracePrintf(1, "Wait found a child process already exited!\n");
     // Remove exited child from list and get its id
-    ret_child_pid = (pop(parent->exited_children))->id;
+    ListNode *ret_child = pop(parent->exited_children);
+    ret_child_pid = ret_child->id;
+    free(ret_child);
 
     // Find this in the dead_proc global list to retreive its return info
     found_item = find_by_id(dead_procs, ret_child_pid);
@@ -121,7 +123,9 @@ int Yalnix_Wait(int *status_ptr, UserContext *uc) {
   }
 
   // Remove exited child from list and get its id
-  ret_child_pid = (pop(parent->exited_children))->id;
+  ListNode *ret_child = pop(parent->exited_children);
+  ret_child_pid = ret_child->id;
+  free(ret_child);
 
   // Find this in the dead_proc global list to retreive its return info
   found_item = find_by_id(dead_procs, ret_child_pid);
@@ -228,9 +232,11 @@ void Yalnix_Exit(int status, UserContext *uc) {
 
   if (has_kids) {
     // Remove pointer to self from all children's PCBs
+    
     while ((iterator = pop(proc->children)) != NULL) {
       child = (PCB_t *) iterator->data;
       child->parent = NULL;   // You rat bastard
+      free(iterator);
     }
   }
 
@@ -245,6 +251,7 @@ void Yalnix_Exit(int status, UserContext *uc) {
     while ((iterator = pop(proc->exited_children)) != NULL) {
       // First, find the node in the dead_procs list
       child_pid = iterator->id;
+      free(iterator);
       temp_node = find_by_id(dead_procs, child_pid);
      
       // If the node is in the global dead_procs list, remove it
@@ -269,7 +276,7 @@ void Yalnix_Exit(int status, UserContext *uc) {
 
     // Add exiting proc to parent's exited children list
     if (parent->exited_children == NULL) {
-      parent->exited_children = (List *) malloc(sizeof(List));
+      parent->exited_children = (List *) init_list();
       bzero(parent->exited_children, sizeof(List));
     }
 
@@ -339,12 +346,16 @@ void Yalnix_Exit(int status, UserContext *uc) {
    * Move on to Next Process
    */
   // Get the next available process
-  next = (PCB_t *) pop(ready_procs)->data;
+  ListNode *next_node = pop(ready_procs);
+  next = (PCB_t *) next_node->data;
+  free(next_node);
   
   // Ensure that we don't run a brand new (uninitialized) proc out of Exit call
   while (next->kc_set == 0) {
     add_to_list(ready_procs, (void *) next, next->proc_id);
-    next = (PCB_t *) pop(ready_procs)->data;
+    next_node = pop(ready_procs);
+    next = (PCB_t *) next_node->data;
+    free(next_node);
   }
 
   TracePrintf(1, "End: Yalnix_Exit\n");
@@ -390,6 +401,7 @@ int Yalnix_Fork(UserContext *uc) {
   unsigned int src;                 // Address to copy from
   int retval;                       // Return value
   int i;                            // Iterator for loops
+  ListNode *node;
 
 
   /* Store the the UserContext of the parent process */  
@@ -444,7 +456,9 @@ int Yalnix_Fork(UserContext *uc) {
       TracePrintf(1, "Not enough frames for child process' kernel stack\n");
       return(ERROR);
     }
-    pfn_temp = pop(&FrameList)->id;
+    node = pop(&FrameList);
+    pfn_temp = node->id;
+    free(node);
     (*(child->region0_pt + i)).pfn = FNUM_TO_PFN(pfn_temp);
   }
 
@@ -459,7 +473,9 @@ int Yalnix_Fork(UserContext *uc) {
         TracePrintf(1, "Not enough frames for child process' region 1\n");
         return(ERROR);
       }
-      pfn_temp = pop(&FrameList)->id;
+      node = pop(&FrameList);
+      pfn_temp = node->id;
+      free(node);
       (*(child->region1_pt + i)).pfn = FNUM_TO_PFN(pfn_temp);
     
     } else {
@@ -537,7 +553,7 @@ int Yalnix_Fork(UserContext *uc) {
 
   // Add record of the child to the parent's List
   if (parent->children == NULL) {
-    parent->children = (List *) malloc(sizeof(List));
+    parent->children = (List *) init_list();
     bzero(parent->children, sizeof(List));
   }
   add_to_list(parent->children, (void *)child, child->proc_id);
@@ -706,7 +722,9 @@ int Yalnix_Exec(UserContext *uc) {
     // Keep default prot and valid settings, but give it a new physical frame
     add_to_list(&FrameList, (void *) NULL, PFN_TO_FNUM((*(proc->region0_pt + i)).pfn));
     // No need to verify that we have enough frames because we just added one
-    (*(proc->region0_pt + i)).pfn = FNUM_TO_PFN((pop(&FrameList))->id);
+    ListNode *node = pop(&FrameList);
+    (*(proc->region0_pt + i)).pfn = FNUM_TO_PFN(node->id);
+    free(node);
   }
   
   // Flush the TLB with the new info
@@ -769,8 +787,10 @@ int Yalnix_Brk(void *addr) {
              
           (*(curr_proc->region1_pt + i)).valid = (u_long) 0x1;
           (*(curr_proc->region1_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
+          ListNode *node = pop(&FrameList);
           (*(curr_proc->region1_pt + i)).pfn = (u_long) ( (PMEM_BASE + 
-                  (pop(&FrameList)->id * PAGESIZE) ) >> PAGESHIFT);
+                  (node->id * PAGESIZE) ) >> PAGESHIFT);
+          free(node);
       }
   }
 
@@ -817,20 +837,32 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
   // setting up the new buffer we'll write to 
   // needs to be on heap to survive context switch
   curr_proc->write_buf = (buffer *)malloc(sizeof(buffer));
-  curr_proc->write_buf->buf = (buffer *)malloc(sizeof(char)*TERMINAL_MAX_LINE);
-  memcpy(((buffer*)curr_proc->write_buf)->buf, buf, sizeof(char)*len);
+  curr_proc->write_buf->buf = (buffer *)malloc(TERMINAL_MAX_LINE);
+  memcpy(((buffer*)curr_proc->write_buf)->buf, buf, len);
   curr_proc->write_buf->len = len;
   
-  add_to_list(tty->buffers, curr_proc->write_buf, 0);
-
   // now we put ourselves on list of writers and start writing
   add_to_list(tty->writers, curr_proc, curr_proc->proc_id);
   
-  TtyTransmit(tty_id, buf, len); 
+  // if we're the only one, transmit
+  // otherwise we'll call transmit from trap
+  if (count_items(tty->writers) == 1) { 
+    TracePrintf(1, "PID: %d I'm the only writer - transmitting now.\n", curr_proc->proc_id);
+    if (len > TERMINAL_MAX_LINE) {
+      TtyTransmit(tty_id, buf, TERMINAL_MAX_LINE);
+    } else { 
+      TtyTransmit(tty_id, buf, len); 
+    } 
 
-  // we've returned from transmit, but aren't finished writing. 
-  // so switch to another proc until we're done
-  switch_to_next_available_proc(curr_proc->uc, 0);
+    // we've returned from transmit, but aren't finished writing. 
+    // so switch to another proc until we're done
+    switch_to_next_available_proc(curr_proc->uc, 0);
+    TracePrintf(1, "PID: %d Finished transmitting.\n", curr_proc->proc_id);
+  } else {
+    TracePrintf(1, "PID: %d Other writers exist, I'll do my writing when I'm woken up in trap transmit\n", curr_proc->proc_id);
+  }
+
+
 
   TracePrintf(1, "End: TtyWrite\n");
   return len;
@@ -857,23 +889,46 @@ int Yalnix_TtyRead(int tty_id, void *buf, int len) {
   // if there's not stored buf, switch procs, then grab 
   // it when we're awake
   if (!buf_node) { 
+    TracePrintf(1, "PID: %d No buffer for us. Going to wait. Should be woken up by trap tty_receive when one is available\n", curr_proc->proc_id);
+    curr_proc->read_len = len;
     add_to_list(tty->readers, curr_proc, curr_proc->proc_id);
     switch_to_next_available_proc(curr_proc->uc, 0);
     // we just woke up, so now there should be a buff! 
-    ListNode *node = pop(buffers);
-    stored_buf = node->data;
-    free(node);
+    TracePrintf(1, "PID: %d Woken up.\n", curr_proc->proc_id);
+    buf_node = pop(buffers);
+    stored_buf = buf_node->data;
   } 
-
+  
   // should be a sanity check... 
   if (!stored_buf) { 
     TracePrintf(3, "Something went wrong in TtyRead..\n");
+    if (buf_node)
+      free(buf_node);
     return ERROR;
   }
-
-  memcpy(buf, stored_buf->buf, len*sizeof(char));  
+  
+  TracePrintf(1, "PID: %d Grabbing buffer.\n", curr_proc->proc_id);
+  curr_proc->read_len = 0;
+  memcpy(buf, stored_buf->buf, len);
+  
+  int stored_buf_chars = strlen(stored_buf->buf);
+  int len_to_store = stored_buf_chars - len;
+  
+  // check if we didn't read full buffer, 
+  // put it back on list if we didn't
+  if (len_to_store > 0) {
+    TracePrintf(1, "PID: %d Didn't read entire buffer - storing the rest.\n", curr_proc->proc_id);
+    len = len - len_to_store ;
+    char *buff_to_store = stored_buf->buf + len;
+    memcpy(stored_buf->buf, buff_to_store, len_to_store);
+    stored_buf->len = len_to_store;
+    add_to_list(tty->buffers, stored_buf, 0);
+  } else { 
+    TracePrintf(1, "PID: %d Read the entire buffer.\n", curr_proc->proc_id);
+  } 
   
   TracePrintf(1, "End: TtyRead\n");
+  free(buf_node);
   return len;
 }
 
@@ -885,7 +940,7 @@ int Yalnix_CvarInit(int *cvar_idp) {
   CVAR_t *cvar = (CVAR_t*)malloc(sizeof(CVAR_t));
   cvar->id = next_resource_id;
   next_resource_id++;
-  cvar->waiters = (List*)malloc( sizeof(List) );
+  cvar->waiters = (List*)init_list();
   
   *cvar_idp = cvar->id;
 
@@ -971,7 +1026,7 @@ int Yalnix_LockInit(int *lock_idp) {
   next_resource_id++;
   lock->is_claimed = 0;
   lock->owner_id = -1;
-  lock->waiters = (List*)malloc( sizeof(List) );
+  lock->waiters = (List*)init_list();
 
   *lock_idp = lock->id;
 
@@ -1062,7 +1117,7 @@ int Yalnix_PipeInit(int *pip_idp) {
     return ERROR;
   }
 
-  pipe->waiters = (List *) malloc( sizeof(List) );
+  pipe->waiters = (List *) init_list();
   if (pipe->waiters == NULL) {
     free(pipe->buf);
     free(pipe);
@@ -1175,7 +1230,6 @@ int Yalnix_PipeWrite(int pipe_id, void *buf, int len) {
   if (waiter_node) { 
     waiter_proc = (PCB_t *) waiter_node->data;
     waiter_id = waiter_node->id;
-    free(waiter_node);
   }
   // Check to see if this waiter should be kept on the list or put back on to
   // waiters
@@ -1194,6 +1248,9 @@ int Yalnix_PipeWrite(int pipe_id, void *buf, int len) {
   }
 
   TracePrintf(1, "Finishing: Yalnix_PipeWrite\n");
+  if (waiter_node)
+    free(waiter_node);
+
   return len;
 } 
 

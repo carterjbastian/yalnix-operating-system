@@ -28,6 +28,7 @@ typedef struct PCB_t {
   int kc_set;             // Set to 1 after a MyKCSClone call
 
   buffer *write_buf; 
+  int read_len;
 } PCB_t;
   
 /*

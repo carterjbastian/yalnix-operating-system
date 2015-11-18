@@ -71,7 +71,7 @@ void KernelStart(char *cmd_args[],
 
   int lp_rc;                            // Return code of load program
   int arg_count;                        // The number of arguments passed into cmd_args
-
+  ListNode *node;                       // Reusable node declaration
   /*
    * =========================================
    *    Initialize Global Kernel Variables,
@@ -94,10 +94,10 @@ void KernelStart(char *cmd_args[],
   top_frame_r1 = UP_TO_PAGE(VMEM_1_LIMIT) >> PAGESHIFT;
 
   // Allocate kernel heap space for the Kernel's Process Queues
-  ready_procs = (List *)malloc( sizeof(List) );
-  blocked_procs = (List *)malloc( sizeof(List) );
-  all_procs = (List *)malloc( sizeof(List) ); 
-  dead_procs = (List *)malloc( sizeof(List) ); 
+  ready_procs = (List *)init_list();
+  blocked_procs = (List *)init_list();
+  all_procs = (List *)init_list(); 
+  dead_procs = (List *)init_list(); 
 
   /*
    * =========================================
@@ -105,20 +105,20 @@ void KernelStart(char *cmd_args[],
    *    ( buffers, (todo: locks, cvars, pipes))
    * =========================================
    */
-  ttys = (List *)malloc( sizeof(List) );
+  ttys = (List *)init_list();
   for (i = 0; i < NUM_TERMINALS; i++) { 
     TTY_t *tmp = (TTY_t *)malloc( sizeof(TTY_t) );
-    tmp->buffers = (List *)malloc( sizeof(List) );
-    tmp->writers = (List *)malloc( sizeof(List) );
-    tmp->readers = (List *)malloc( sizeof(List) );
+    tmp->buffers = (List *)init_list();
+    tmp->writers = (List *)init_list();
+    tmp->readers = (List *)init_list();
     tmp->id = i;
     add_to_list(ttys, (void *)tmp, i); 
   }
 
   next_resource_id = 0;
-  locks = (List *)malloc( sizeof(List) );
-  cvars = (List *)malloc( sizeof(List) );
-  pipes = (List *)malloc( sizeof(List) );
+  locks = (List *)init_list();
+  cvars = (List *)init_list();
+  pipes = (List *)init_list();
 
 // Create the list of empty frames
     // NOTE: in FrameList, the number of the physical frame is
@@ -203,8 +203,12 @@ void KernelStart(char *cmd_args[],
 
   // Set up the user stack by allocating two frames
   // leaving the very top one empty (for the hardware)
-  idle_stack_fnum1 = pop(&FrameList)->id;
-  idle_stack_fnum2 = pop(&FrameList)->id;
+  node = pop(&FrameList);
+  idle_stack_fnum1 = node->id;
+  free(node);
+  node = pop(&FrameList);
+  idle_stack_fnum2 = node->id;
+  free(node);
 
   // Update the r1 page table with validity & pfn of idle's stack
   r1_pagetable[VMEM_1_PAGE_COUNT - 1].valid = (u_long) 0x1;
@@ -269,7 +273,9 @@ void KernelStart(char *cmd_args[],
   for (i = 0; i < KS_NPG; i++) {
     (*(init_proc->region0_pt + i)).valid = (u_long) 0x1;
     (*(init_proc->region0_pt + i)).prot = (u_long) (PROT_READ | PROT_WRITE);
-    (*(init_proc->region0_pt + i)).pfn = (u_long) ((pop(&FrameList)->id * PAGESIZE) >> PAGESHIFT);  
+    node = pop(&FrameList);
+    (*(init_proc->region0_pt + i)).pfn = (u_long) ((node->id * PAGESIZE) >> PAGESHIFT);  
+    free(node);
   }
   
   // Flush the TLB having updated pagetables
@@ -279,7 +285,7 @@ void KernelStart(char *cmd_args[],
   init_proc->parent = idle_proc;
 
   // Allocate idle_proc's child list and add init to it
-  idle_proc->children = (List *) malloc(sizeof(List));
+  idle_proc->children = init_list();
   add_to_list(idle_proc->children, (void *)init_proc, init_proc->proc_id);
  
   // Get the argument list and program name from args passed to KernelStart
@@ -470,7 +476,10 @@ int switch_to_next_available_proc(UserContext *uc, int should_run_again){
     add_to_list(ready_procs, (void *) curr_proc, curr_proc->proc_id);
  
   // Tries to switch to the next process in the ready queue
-  PCB_t *next_proc = (pop(ready_procs))->data;
+  ListNode *node;
+  node = pop(ready_procs);
+  PCB_t *next_proc = node->data;
+  free(node);
   if (perform_context_switch(curr_proc, next_proc, uc) != 0) {
     TracePrintf(1, "Context Switch failed\n");
     TracePrintf(1, "End: switch_to_next_available_proc \n");
@@ -541,7 +550,7 @@ int SetKernelBrk(void * addr) {
   // Check that the requested address is within the proper bounds of
   // where the break should ever be allowed to be
   if ((unsigned int) addr > (unsigned int)KERNEL_STACK_BASE || addr < kernel_data_start) {
-    TracePrintf(1, "SetKernelBrk Error: address requested not in bounds\n");
+    TracePrintf(1, "SetKernelBrk Error: address requested: %p not in bounds. KERNEL_STACK_BASE: %p, kernel_data_start: %p\n", addr, KERNEL_STACK_BASE, kernel_data_start);
     return -1;
   }
 

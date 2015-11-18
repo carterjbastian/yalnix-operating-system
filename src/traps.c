@@ -289,7 +289,9 @@ void HANDLE_TRAP_MEMORY(UserContext *uc) {
         temp_ent->valid = (u_long) 0x1;
         temp_ent->prot = (u_long) (PROT_READ | PROT_WRITE);
         // Get it a page
-        temp_ent->pfn = (u_long) (((pop(&FrameList))->id * PAGESIZE) >> PAGESHIFT);
+        ListNode *node = pop(&FrameList);
+        temp_ent->pfn = (u_long) ((node->id * PAGESIZE) >> PAGESHIFT);
+        free(node);
       }
   }
   
@@ -322,48 +324,33 @@ void HANDLE_TRAP_TTY_RECEIVE(UserContext *uc) {
 
   TracePrintf(1, "Start: Handle_trap_tty_receive\n");
   
-  int id = uc->code; 
+  int id = uc->code;
   ListNode *tty_node = find_by_id(ttys, id);
   TTY_t *tty = tty_node->data;
   
   buffer *new_buf = (buffer *)malloc(sizeof(buffer));
-  new_buf->buf = (buffer *)malloc(TERMINAL_MAX_LINE*sizeof(char));
+  new_buf->buf = (char *)malloc(TERMINAL_MAX_LINE);
   new_buf->len = TtyReceive(tty->id, new_buf->buf, TERMINAL_MAX_LINE);
+  int len = new_buf->len;
   
   // now that we've grabbed the text, let's store it: 
   add_to_list(tty->buffers, new_buf, 0);
+  TracePrintf(1, "PID: %d Just TtyReceived - added buffer to list for someone to grab .\n", curr_proc->proc_id);
   
   // if a reader is waiting, let's wake him/her up:
   List *readers = tty->readers;
-  ListNode *waiter_node = pop(readers);
+  ListNode *waiter_node;
   PCB_t *waiter;
-  if (waiter_node) { 
+  while (len > 0 && count_items(readers) > 0) {
+    waiter_node = pop(readers);
+    TracePrintf(1, "PID: %d Found a waiter - adding to ready queue. \n", curr_proc->proc_id);
+    TracePrintf(1, " \n", curr_proc->proc_id);        
     waiter = waiter_node->data;
     remove_from_list(tty->readers, waiter);
     add_to_list(ready_procs, waiter, 0);
-  } 
-
-  /* 
-  // handle case if reader wants to read less than 
-  // what we have
-  if (strlen(stored_buf->buf) > len) {   
-    
-    int leftover_length = strlen(stored_buf->buf) - len;
-    char* leftover_char_buf;
-    strncpy(leftover_char_buf, stored_buf->buf + len, leftover_length);
-    buffer *leftover_buf = malloc(sizeof(buffer));
-    leftover_buf->len = leftover_length;
-    leftover_buf->buf = leftover_char_buf;
-    add_to_list(tty->buffers, leftover_buf, 0);
-    
-  } else { 
-    
-    // only copy len chars, don't "overcopy"
-    if (strlen(stored_buf->buf) < len) { 
-      len = strlen(stored_buf->buf);
-    }
+    len = len - waiter->read_len;
+    free(waiter_node);
   }
-  */
 
   TracePrintf(1, "End: Handle_trap_tty_receive\n");
 } 
@@ -384,10 +371,23 @@ void HANDLE_TRAP_TTY_TRANSMIT(UserContext *uc) {
   
   ListNode *writer_node = pop(tty->writers);
   PCB_t *writer = writer_node->data;
+  free(writer_node);
   
+  TracePrintf(1, "PID: %d Found a waiter - adding to ready queue. \n", curr_proc->proc_id);
   add_to_list(ready_procs, writer, writer->proc_id);
-  add_to_list(tty->buffers, writer->write_buf, 0);
 
+  // since we just trapped, we should check to see if anyone is waiting 
+  ListNode *next_writer_node;
+  if (count_items(tty->writers) > 0) { 
+    next_writer_node = pop(tty->writers);
+    PCB_t *next_writer = next_writer_node->data;
+    if (next_writer->write_buf->len > TERMINAL_MAX_LINE)
+      TtyTransmit(tty->id, next_writer->write_buf->buf, TERMINAL_MAX_LINE);
+    else 
+      TtyTransmit(tty->id, next_writer->write_buf->buf, next_writer->write_buf->len);
+    free(next_writer_node);
+  } 
+  
   TracePrintf(1, "End: Handle_trap_tty_transmit\n");
 } 
 

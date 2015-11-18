@@ -8,7 +8,7 @@ typedef struct ListNode ListNode;
 struct ListNode { 
   int id;
   void *data; 
-  ListNode *next; 
+  ListNode *next;
   ListNode *prev;
 };
 
@@ -18,6 +18,7 @@ typedef struct List {
 } List;
 
 // Functions related to the linked lists
+List *init_list();
 void add_to_list(List *list, void *data, int id);
 int remove_from_list(List *list, void *data);
 int count_items(List *list);
