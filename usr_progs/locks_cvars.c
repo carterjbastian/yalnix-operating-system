@@ -1,4 +1,31 @@
-int global = 0;
+
+void work(int fake_pid, int cvar_id, int lock_id) { 
+  Pause();
+  TracePrintf(1, "P%d awake, trying to acquire lock\n", fake_pid);
+  Acquire(lock_id);
+  TracePrintf(1, "P%d has lock.\n", fake_pid);
+  TracePrintf(1, "P%d waiting.\n", fake_pid);
+  CvarWait(cvar_id, lock_id);
+  TracePrintf(1, "P%d done waiting. Doing work\n", fake_pid);
+  Pause();
+  TracePrintf(1, "P%d releasing lock!\n", fake_pid);
+  Release(lock_id);
+};
+
+
+void work_and_signal(int fake_pid, int cvar_id, int lock_id) { 
+  TracePrintf(1, "P%d awake, trying to acquire lock\n", fake_pid);
+  Acquire(lock_id);
+  TracePrintf(1, "P%d has lock.\n", fake_pid);
+  TracePrintf(1, "P%d waiting.\n", fake_pid);
+  CvarWait(cvar_id, lock_id);
+  TracePrintf(1, "P%d done waiting. Doing work\n", fake_pid);
+  Pause();
+  Pause();
+  TracePrintf(1, "P%d signaling and releasing lock\n", fake_pid);
+  CvarSignal(cvar_id);
+  Release(lock_id);
+};
 
 int main(int argc, char*argv[]) { 
   
@@ -31,6 +58,7 @@ int main(int argc, char*argv[]) {
 
   // test locks 
   int pid;
+
   pid = GetPid();
   rc = Fork();
   if (rc == 0) { 
@@ -78,9 +106,8 @@ int main(int argc, char*argv[]) {
   
   TracePrintf(1, "Finished Testing Locks\n", rc);
 
-
   // test cvar
-  TracePrintf(1, "Starting Cvar Testing\n", rc);
+  TracePrintf(1, "Starting Cvar Broadcast Testing\n", rc);
   rc = Fork();
 
   if (rc == 0) { 
@@ -90,63 +117,23 @@ int main(int argc, char*argv[]) {
 
       rc = Fork();
       if (rc == 0) { 
-        
         // P4
-        TracePrintf(1, "P4 awake, trying to acquire lock\n");
-        Acquire(lock_id);
-        TracePrintf(1, "P4 acquired lock, now waiting for global to be > 0\n");
-        while(global < 2) { 
-          CvarWait(cvar_id, lock_id);
-        } 
-        TracePrintf(1, "P4 finished waiting. Working....\n");
-        Pause();
-        global++;
-        TracePrintf(1, "P4 set global = %d\n", global);
-        TracePrintf(1, "P4 signaled, now releasing lock\n");
-        Release(lock_id);
-        Pause();
+        work(4, cvar_id, lock_id);
         Exit(400);        
       } else { 
-      
-        // P3 
-        TracePrintf(1, "P3 awake, trying to acquire lock\n");
-        Acquire(lock_id);
-        TracePrintf(1, "P3 acquired lock, now waiting for global to be > 0\n");
-        while(global < 1) { 
-          CvarWait(cvar_id, lock_id);
-        } 
-        TracePrintf(1, "P3 finished waiting. Working....\n");
-        Pause();
-        global++;
-        TracePrintf(1, "P3 set global = %d\n", global);
-        CvarSignal(cvar_id);
-        TracePrintf(1, "P3 signaled, now releasing lock\n");
-        Release(lock_id);
+        // P3
+        work(3, cvar_id, lock_id);
         int status;
         Wait(&status);
-        Pause();
         Exit(300);
       }
       
     } else { 
       
       // P2
-      TracePrintf(1, "P2 awake, trying to acquire lock\n");
-      Acquire(lock_id);
-      TracePrintf(1, "P2 acquired lock, now waiting for global to be > 1\n");
-      while(global < 2) { 
-        CvarWait(cvar_id, lock_id);
-      } 
-      TracePrintf(1, "P2 finished waiting. Working....\n");
-      Pause();
-      global++;
-      TracePrintf(1, "P2 set global = %d\n", global);
-      CvarSignal(cvar_id);
-      TracePrintf(1, "P2 signaled, now releasing lock\n");
-      Release(lock_id);
+      work(2, cvar_id, lock_id);
       int status;
       Wait(&status);
-      Pause();
       Exit(200);
     } 
     
@@ -155,24 +142,75 @@ int main(int argc, char*argv[]) {
     // P1
     Pause();
     Pause();
-    TracePrintf(1, "P1 awake, trying to acquire lock\n");
-    Acquire(lock_id);
-    TracePrintf(1, "P1 acquired lock, doing work...\n");
     Pause();
-    global++;
-    TracePrintf(1, "P1 set global = %d\n", global);
+    Pause();
+    Pause();
+    Pause();
+    TracePrintf(1, "P1 awake. Acquire, signal, release\n");
+    Acquire(lock_id);
     CvarBroadcast(cvar_id);
-    TracePrintf(1, "P1 broadcasted and now releasing lock\n");
     Release(lock_id);
     int status;
     Wait(&status);
-    TracePrintf(1, "P1 got exit code of p2: %d\n", status);
   }
 
-  TracePrintf(1, "Finished with cvar waiting... global = %d\n", global);
-  TracePrintf(1, "Finished testing Cvars.\n");
+  TracePrintf(1, "Finished Broadcast testing.\n");
 
+
+  // -------------------------
+  
+  
+  TracePrintf(1, "Starting Cvar Signal Testing\n", rc);
+  rc = Fork();
+
+  if (rc == 0) { 
+    
+    rc = Fork();
+    if (rc == 0) { 
+
+      rc = Fork();
+      if (rc == 0) { 
+        // P4
+        work_and_signal(4, cvar_id, lock_id);
+        Exit(400);        
+      } else { 
+        // P3
+        work_and_signal(3, cvar_id, lock_id);
+        int status;
+        Wait(&status);
+        Exit(300);
+      }
+      
+    } else { 
+      
+      // P2
+      work_and_signal(2, cvar_id, lock_id);
+      int status;
+      Wait(&status);
+      Exit(200);
+    } 
+    
+  } else { 
+    
+    // P1
+    Pause();
+    Pause();
+    Pause();
+    Pause();
+    Pause();
+    TracePrintf(1, "P1 awake. Acquire, signal, release\n");
+    Acquire(lock_id);
+    CvarSignal(cvar_id);
+    Release(lock_id);
+    int status;
+    Wait(&status);
+  }
+
+  TracePrintf(1, "Finished Signal Testing\n");
   TracePrintf(1, "End: locks_cvars.c\n");
 
   return 0;
 }
+
+
+

@@ -840,7 +840,7 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
   if (curr_proc->write_buf->buf) 
     free(curr_proc->write_buf->buf);
 
-  curr_proc->write_buf->buf = calloc(len, sizeof(char));
+  curr_proc->write_buf->buf = (char *)calloc(len, sizeof(char));
   memcpy(((buffer*)curr_proc->write_buf)->buf, buf, len);
   curr_proc->write_buf->len = len;
   
@@ -856,17 +856,13 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
     } else { 
       TtyTransmit(tty_id, buf, len); 
     } 
-    
-    // we've returned from transmit, but aren't finished writing. 
-    // so switch to another proc until we're done
-    switch_to_next_available_proc(curr_proc->uc, 0);
-    TracePrintf(1, "PID: %d Finished transmitting.\n", curr_proc->proc_id);
   } else {
     TracePrintf(1, "PID: %d Other writers exist, I'll do my writing when I'm woken up in trap transmit\n", curr_proc->proc_id);
   }
 
+  switch_to_next_available_proc(curr_proc->uc, 0);
 
-
+  TracePrintf(1, "PID: %d Finished transmitting.\n", curr_proc->proc_id);
   TracePrintf(1, "End: TtyWrite\n");
   return len;
 } 
@@ -990,14 +986,14 @@ int Yalnix_CvarBroadcast(int cvar_id)  {
   while(waiter_node) { 
     PCB_t *waiter = waiter_node->data;
     add_to_list(ready_procs, waiter, waiter->proc_id);
-    waiter_node = waiter_node->next;
+    waiter_node = pop(cvar->waiters);
   } 
   TracePrintf(1, "Finishing: Yalnix_CvarBroadcast\n"); 
   return SUCCESS;
 } 
 
 int Yalnix_CvarWait(int cvar_id, int lock_id) { 
-  TracePrintf(1, "Starting: Yalnix_CvarWait\n");
+  TracePrintf(1, "Starting: Yalnix_CvarWait %d\n", curr_proc->proc_id);
   ListNode *cvar_node = find_by_id(cvars, cvar_id);
   if (!cvar_node) { 
     return ERROR;
@@ -1005,17 +1001,22 @@ int Yalnix_CvarWait(int cvar_id, int lock_id) {
   CVAR_t *cvar = cvar_node->data;
   
   ListNode *lock_node = find_by_id(locks, lock_id);
-  if (!lock_node) { 
+  if (!lock_node) {
+    TracePrintf(1, "Bad luck ID given to CvarWait\n");
     return ERROR;
   } 
   LOCK_t *lock = lock_node->data;
   
+  TracePrintf(1, "%d: Releasing lock, waiting to be signaled\n", curr_proc->proc_id);
   Yalnix_Release(lock->id);
   
   add_to_list(cvar->waiters, curr_proc, curr_proc->proc_id);
   switch_to_next_available_proc(curr_proc->uc, 0);
-
+  
+  TracePrintf(1, "Was signaled. Acquiring lock.  %d\n", curr_proc->proc_id);
   Yalnix_Acquire(lock->id);
+  TracePrintf(1, "Has lock  %d\n", curr_proc->proc_id);
+
   TracePrintf(1, "Finishing: Yalnix_CvarWait\n");
 }
 
