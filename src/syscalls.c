@@ -839,7 +839,7 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
   if (curr_proc->write_buf->buf) 
     free(curr_proc->write_buf->buf);
 
-  curr_proc->write_buf->buf = calloc(len, sizeof(char));
+  curr_proc->write_buf->buf = (char *)calloc(len, sizeof(char));
   memcpy(((buffer*)curr_proc->write_buf)->buf, buf, len);
   curr_proc->write_buf->len = len;
   

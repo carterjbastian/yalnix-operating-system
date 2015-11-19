@@ -1,4 +1,31 @@
-int global = 0;
+
+void work(int fake_pid, int cvar_id, int lock_id) { 
+  Pause();
+  TracePrintf(1, "P%d awake, trying to acquire lock\n", fake_pid);
+  Acquire(lock_id);
+  TracePrintf(1, "P%d has lock.\n", fake_pid);
+  TracePrintf(1, "P%d waiting.\n", fake_pid);
+  CvarWait(cvar_id, lock_id);
+  TracePrintf(1, "P%d done waiting. Doing work\n", fake_pid);
+  Pause();
+  TracePrintf(1, "P%d releasing lock!\n", fake_pid);
+  Release(lock_id);
+};
+
+
+void work_and_signal(int fake_pid, int cvar_id, int lock_id) { 
+  TracePrintf(1, "P%d awake, trying to acquire lock\n", fake_pid);
+  Acquire(lock_id);
+  TracePrintf(1, "P%d has lock.\n", fake_pid);
+  TracePrintf(1, "P%d waiting.\n", fake_pid);
+  CvarWait(cvar_id, lock_id);
+  TracePrintf(1, "P%d done waiting. Doing work\n", fake_pid);
+  Pause();
+  Pause();
+  TracePrintf(1, "P%d signaling and releasing lock\n", fake_pid);
+  CvarSignal(cvar_id);
+  Release(lock_id);
+};
 
 int main(int argc, char*argv[]) { 
   
@@ -31,7 +58,7 @@ int main(int argc, char*argv[]) {
 
   // test locks 
   int pid;
-  /*
+
   pid = GetPid();
   rc = Fork();
   if (rc == 0) { 
@@ -79,7 +106,6 @@ int main(int argc, char*argv[]) {
   
   TracePrintf(1, "Finished Testing Locks\n", rc);
 
-*/
   // test cvar
   TracePrintf(1, "Starting Cvar Broadcast Testing\n", rc);
   rc = Fork();
@@ -187,30 +213,4 @@ int main(int argc, char*argv[]) {
 }
 
 
-void work(int fake_pid, int cvar_id, int lock_id) { 
-  Pause();
-  TracePrintf(1, "P%d awake, trying to acquire lock\n", fake_pid);
-  Acquire(lock_id);
-  TracePrintf(1, "P%d has lock.\n", fake_pid);
-  TracePrintf(1, "P%d waiting.\n", fake_pid);
-  CvarWait(cvar_id, lock_id);
-  TracePrintf(1, "P%d done waiting. Doing work\n", fake_pid);
-  Pause();
-  TracePrintf(1, "P%d releasing lock!\n", fake_pid);
-  Release(lock_id);
-};
 
-
-void work_and_signal(int fake_pid, int cvar_id, int lock_id) { 
-  TracePrintf(1, "P%d awake, trying to acquire lock\n", fake_pid);
-  Acquire(lock_id);
-  TracePrintf(1, "P%d has lock.\n", fake_pid);
-  TracePrintf(1, "P%d waiting.\n", fake_pid);
-  CvarWait(cvar_id, lock_id);
-  TracePrintf(1, "P%d done waiting. Doing work\n", fake_pid);
-  Pause();
-  Pause();
-  TracePrintf(1, "P%d signaling and releasing lock\n", fake_pid);
-  CvarSignal(cvar_id);
-  Release(lock_id);
-};
