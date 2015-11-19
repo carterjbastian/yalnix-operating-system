@@ -989,14 +989,14 @@ int Yalnix_CvarBroadcast(int cvar_id)  {
   while(waiter_node) { 
     PCB_t *waiter = waiter_node->data;
     add_to_list(ready_procs, waiter, waiter->proc_id);
-    waiter_node = waiter_node->next;
+    waiter_node = pop(cvar->waiters);
   } 
   TracePrintf(1, "Finishing: Yalnix_CvarBroadcast\n"); 
   return SUCCESS;
 } 
 
 int Yalnix_CvarWait(int cvar_id, int lock_id) { 
-  TracePrintf(1, "Starting: Yalnix_CvarWait\n");
+  TracePrintf(1, "Starting: Yalnix_CvarWait %d\n", curr_proc->proc_id);
   ListNode *cvar_node = find_by_id(cvars, cvar_id);
   if (!cvar_node) { 
     return ERROR;
@@ -1004,17 +1004,22 @@ int Yalnix_CvarWait(int cvar_id, int lock_id) {
   CVAR_t *cvar = cvar_node->data;
   
   ListNode *lock_node = find_by_id(locks, lock_id);
-  if (!lock_node) { 
+  if (!lock_node) {
+    TracePrintf(1, "Bad luck ID given to CvarWait\n");
     return ERROR;
   } 
   LOCK_t *lock = lock_node->data;
   
+  TracePrintf(1, "%d: Releasing lock, waiting to be signaled\n", curr_proc->proc_id);
   Yalnix_Release(lock->id);
   
   add_to_list(cvar->waiters, curr_proc, curr_proc->proc_id);
   switch_to_next_available_proc(curr_proc->uc, 0);
-
+  
+  TracePrintf(1, "Was signaled. Acquiring lock.  %d\n", curr_proc->proc_id);
   Yalnix_Acquire(lock->id);
+  TracePrintf(1, "Has lock  %d\n", curr_proc->proc_id);
+
   TracePrintf(1, "Finishing: Yalnix_CvarWait\n");
 }
 
