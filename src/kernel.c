@@ -296,10 +296,15 @@ void KernelStart(char *cmd_args[],
 
     // Load the program from the text file
     if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
+      // Restore old PTBR1 if we failed
+      WriteRegister(REG_PTBR1, (unsigned int)&r1_pagetable);
+      WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
       TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
-      exit(ERROR);
+    } else { 
+      add_to_list(all_procs, (void *)init_proc, init_proc->proc_id);      
+      add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
     } 
-
+    
   } else {
       arg_count = 0;
       // Count the number of command line arguments
@@ -318,10 +323,15 @@ void KernelStart(char *cmd_args[],
       char *progname = arglist[0];
 
     // Load the program from the text file
-    if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
+    if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {      
+      // Restore old PTBR1 if we failed
+      WriteRegister(REG_PTBR1, (unsigned int)&r1_pagetable);
+      WriteRegister(REG_TLB_FLUSH, TLB_FLUSH_ALL);
       TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
-      exit(ERROR);
-    }
+    } else { 
+      add_to_list(all_procs, (void *)init_proc, init_proc->proc_id);      
+      add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
+    } 
 
   }
 
@@ -334,10 +344,7 @@ void KernelStart(char *cmd_args[],
 
   // update the all_procs queue
   add_to_list(all_procs, (void *)idle_proc, idle_proc->proc_id);
-  add_to_list(all_procs, (void *)init_proc, init_proc->proc_id);
 
-  // We're going to start with idle and then switch to init
-  add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
   curr_proc = idle_proc; 
 
   // Copy idle's UserContext into the current UserContext
