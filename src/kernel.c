@@ -290,6 +290,16 @@ void KernelStart(char *cmd_args[],
  
   // Get the argument list and program name from args passed to KernelStart
   if (cmd_args[0] == '\0') {
+    add_to_list(all_procs, (void *)idle_proc, idle_proc->proc_id);
+
+    curr_proc = idle_proc; 
+
+    // copy idle's usercontext into the current usercontext
+    memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
+
+    TracePrintf(1, "end: kernelstart\n");
+
+    /*
     // Default arguments
     char *arglist[] = {"init", '\0'};
     char *progname = "./usr_progs/init";
@@ -305,6 +315,7 @@ void KernelStart(char *cmd_args[],
       add_to_list(ready_procs, (void *)init_proc, init_proc->proc_id);
     } 
     
+    */
   } else {
       arg_count = 0;
       // Count the number of command line arguments
@@ -347,11 +358,11 @@ void KernelStart(char *cmd_args[],
 
   curr_proc = idle_proc; 
 
-  // Copy idle's UserContext into the current UserContext
+  // copy idle's usercontext into the current usercontext
   memcpy(uctxt, idle_proc->uc, sizeof(UserContext));
 
 
-  TracePrintf(1, "End: KernelStart\n");
+  TracePrintf(1, "end: kernelstart\n");
 } 
 
 
