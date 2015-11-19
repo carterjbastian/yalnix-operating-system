@@ -836,8 +836,10 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
   
   // setting up the new buffer we'll write to 
   // needs to be on heap to survive context switch
-  curr_proc->write_buf = (buffer *)malloc(sizeof(buffer));
-  curr_proc->write_buf->buf = (buffer *)malloc(TERMINAL_MAX_LINE);
+  if (curr_proc->write_buf->buf) 
+    free(curr_proc->write_buf->buf);
+
+  curr_proc->write_buf->buf = calloc(len, sizeof(char));
   memcpy(((buffer*)curr_proc->write_buf)->buf, buf, len);
   curr_proc->write_buf->len = len;
   
@@ -853,7 +855,7 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
     } else { 
       TtyTransmit(tty_id, buf, len); 
     } 
-
+    
     // we've returned from transmit, but aren't finished writing. 
     // so switch to another proc until we're done
     switch_to_next_available_proc(curr_proc->uc, 0);
@@ -893,6 +895,7 @@ int Yalnix_TtyRead(int tty_id, void *buf, int len) {
     curr_proc->read_len = len;
     add_to_list(tty->readers, curr_proc, curr_proc->proc_id);
     switch_to_next_available_proc(curr_proc->uc, 0);
+
     // we just woke up, so now there should be a buff! 
     TracePrintf(1, "PID: %d Woken up.\n", curr_proc->proc_id);
     buf_node = pop(buffers);
@@ -918,7 +921,7 @@ int Yalnix_TtyRead(int tty_id, void *buf, int len) {
   // put it back on list if we didn't
   if (len_to_store > 0) {
     TracePrintf(1, "PID: %d Didn't read entire buffer - storing the rest.\n", curr_proc->proc_id);
-    len = len - len_to_store ;
+    len = len - len_to_store;
     char *buff_to_store = stored_buf->buf + len;
     memcpy(stored_buf->buf, buff_to_store, len_to_store);
     stored_buf->len = len_to_store;
@@ -1258,8 +1261,8 @@ int Yalnix_PipeWrite(int pipe_id, void *buf, int len) {
    Destory lock, condition variable, or piped identified by id
    and release resources. 
    If this function is called and processes
-   are waiting on the resource, they will continue waiting.
-   It's the user's job to handle it. 
+   are waiting on the resource, or have it locked, this returns ERROR
+   Otherwise returns SUCCESS
 */
 int Yalnix_Reclaim(int id) { 
 
@@ -1267,19 +1270,45 @@ int Yalnix_Reclaim(int id) {
   
   if (node = find_by_id(locks, id)) { 
     
+    LOCK_t *lock = node->data;
+
+    if (count_items(lock->waiters) > 0) { 
+      TracePrintf(1, "Can't reclaim lock: people are waiting on it.");
+      return ERROR;
+    } 
+    
+    if (lock->is_claimed) {
+      TracePrintf(1, "Can't reclaim lock: someone has it");
+      return ERROR;
+    }
+    
     remove_from_list(locks, node->data);
-    free(node);
+    free(lock);
     
   } else if (node = find_by_id(cvars, id)) { 
     
+    CVAR_t *cvar = node->data;
+    
+    if (count_items(cvar->waiters) > 0) { 
+      TracePrintf(1, "Can't reclaim cvar: people are waiting on it.");
+      return ERROR;
+    } 
+    
     remove_from_list(cvars, node->data);
-    free(node);
+    free(cvar);
     
   } else if (node = find_by_id(pipes, id)) { 
 
-    remove_from_list(pipes, node->data);
-    free(node);
+    pipe_t *pipe = node->data;
     
+    if (count_items(pipe->waiters) > 0) { 
+      TracePrintf(1, "Can't reclaim pipe: people are waiting on it.");
+      return ERROR;
+    } 
+    
+    remove_from_list(pipes, node->data);
+    free(pipe->buf);
+    free(pipe);
   } 
   
   return SUCCESS;

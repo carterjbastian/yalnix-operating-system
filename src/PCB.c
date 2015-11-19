@@ -45,6 +45,10 @@ PCB_t *new_process(UserContext *uc) {
   pcb->brk_addr = 0;
   pcb->kc_set = 0;
 
+  pcb->write_buf = (buffer *)malloc(sizeof(buffer));
+  pcb->write_buf->buf = NULL;
+  pcb->write_buf->len = 0;
+  
   TracePrintf(1, "End: new_process\n");
 
   return pcb;

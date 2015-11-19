@@ -130,11 +130,11 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
       case YALNIX_PIPE_WRITE:
         retval = Yalnix_PipeWrite((int)uc->regs[0], (void *)uc->regs[1], (int)uc->regs[2]);
         break;
-/*
+
       case YALNIX_RECLAIM:
         retval = Yalnix_Reclaim((int)uc->regs[0]);
         break;        
-*/
+
       default:
         TracePrintf(3, "Unrecognized syscall: %d\n", uc->code);
         break;
@@ -344,9 +344,7 @@ void HANDLE_TRAP_TTY_RECEIVE(UserContext *uc) {
   while (len > 0 && count_items(readers) > 0) {
     waiter_node = pop(readers);
     TracePrintf(1, "PID: %d Found a waiter - adding to ready queue. \n", curr_proc->proc_id);
-    TracePrintf(1, " \n", curr_proc->proc_id);        
     waiter = waiter_node->data;
-    remove_from_list(tty->readers, waiter);
     add_to_list(ready_procs, waiter, 0);
     len = len - waiter->read_len;
     free(waiter_node);
@@ -372,25 +370,47 @@ void HANDLE_TRAP_TTY_TRANSMIT(UserContext *uc) {
   ListNode *writer_node = pop(tty->writers);
   PCB_t *writer = writer_node->data;
   free(writer_node);
-  
-  TracePrintf(1, "PID: %d Found a waiter - adding to ready queue. \n", curr_proc->proc_id);
-  add_to_list(ready_procs, writer, writer->proc_id);
 
-  // since we just trapped, we should check to see if anyone is waiting 
-  ListNode *next_writer_node;
-  if (count_items(tty->writers) > 0) { 
-    next_writer_node = pop(tty->writers);
-    PCB_t *next_writer = next_writer_node->data;
-    if (next_writer->write_buf->len > TERMINAL_MAX_LINE)
-      TtyTransmit(tty->id, next_writer->write_buf->buf, TERMINAL_MAX_LINE);
+  // check if we need to write multiple times, and do so 
+  // otherwise, add this proc to ready_queue, and transmit 
+  // the next writer who's been waiting
+  int remaining_msg_len = writer->write_buf->len - TERMINAL_MAX_LINE;
+  if (remaining_msg_len > 0) { 
+    
+    // set remaining length and increment ptr in string
+    writer->write_buf->len = remaining_msg_len;
+    writer->write_buf->buf = writer->write_buf + TERMINAL_MAX_LINE;
+    add_to_list(tty->writers, writer, 0);
+    
+    if (remaining_msg_len > TERMINAL_MAX_LINE)
+      TtyTransmit(tty->id, writer->write_buf->buf, TERMINAL_MAX_LINE);
     else 
-      TtyTransmit(tty->id, next_writer->write_buf->buf, next_writer->write_buf->len);
-    free(next_writer_node);
-  } 
+      TtyTransmit(tty->id, writer->write_buf->buf, writer->write_buf->len);
+    
+  } else { 
+    
+    // we're done, so throw this proc on ready queue
+    add_to_list(ready_procs, writer, writer->proc_id);
+    
+    // since we just trapped, we should check to see if anyone is waiting
+    ListNode *next_writer_node;
+    if (count_items(tty->writers) > 0) {
+      next_writer_node = pop(tty->writers);
+      PCB_t *next_writer = next_writer_node->data;
+      add_to_list(tty->writers, next_writer, 0);
+      if (next_writer->write_buf->len > TERMINAL_MAX_LINE)
+        TtyTransmit(tty->id, next_writer->write_buf->buf, TERMINAL_MAX_LINE);
+      else 
+        TtyTransmit(tty->id, next_writer->write_buf->buf, next_writer->write_buf->len);
+      free(next_writer_node);
+    } 
+    
+  }
   
   TracePrintf(1, "End: Handle_trap_tty_transmit\n");
 } 
 
-void HANDLE_TRAP_DISK(UserContext *uc) {
-  // do things
-}
+// To avoid errors by hardware
+void HANDLE_TRAP_DISK(UserContext *uc) { 
+  
+} 
