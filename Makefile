@@ -45,20 +45,22 @@ KERNEL_INCS = $(SRCDIR)/kernel.h $(SRCDIR)/PCB.h $(SRCDIR)/linked_list.h $(SRCDI
 USER_APPS = $(USRDIR)/init $(USRDIR)/simple_getpid $(USRDIR)/delay $(USRDIR)/brk \
 	    $(USRDIR)/fork $(USRDIR)/new_prog $(USRDIR)/exec $(USRDIR)/exit \
 	    $(USRDIR)/fatal_errors $(USRDIR)/tty $(USRDIR)/locks_cvars $(USRDIR)/wait_short \
-	    $(USRDIR)/wait_long $(USRDIR)/pipe $(TESTDIR)/forktest $(TESTDIR)/torture
+	    $(USRDIR)/wait_long $(USRDIR)/pipe $(TESTDIR)/forktest $(TESTDIR)/torture \
+		$(TESTDIR)/bigstack $(TESTDIR)/zero
 
 #List all user program source files here.  SHould be the same as the previous list, with ".c" added to each file
 USER_SRCS = $(USRDIR)/init.c $(USRDIR)/simple_getpid.c $(USRDIR)/delay.c $(USRDIR)/brk.c \
 	    $(USRDIR)/fork.c $(USRDIR)/new_prog.c $(USRDIR)/exec.c $(USRDIR)/exit.c \
 	    $(USRDIR)/fatal_errors.c $(USRDIR)/tty.c $(USRDIR)/locks_cvars.c $(USRDIR)/wait_short.c \
-	    $(USRDIR)/wait_long.c $(USRDIR)/pipe.c $(TESTDIR)/forktest.c $(TESTDIR)/torture.c
+	    $(USRDIR)/wait_long.c $(USRDIR)/pipe.c $(TESTDIR)/forktest.c $(TESTDIR)/torture.c \
+		$(TESTDIR)/bigstack.c $(TESTDIR)/zero.c
 
 #List the objects to be formed form the user  source files here.  Should be the same as the prvious list, replacing ".c" with ".o"
 USER_OBJS = $(USRDIR)/init.o $(USRDIR)/simple_getpid.o $(USRDIR)/delay.o $(USRDIR)/brk.o \
 	    $(USRDIR)/fork.o $(USRDIR)/new_prog.o $(USRDIR)/exec.o $(USRDIR)/exit.o \
 	    $(USRDIR)/fatal_errors.o $(USRDIR)/tty.o $(USRDIR)/locks_cvars.o \
 	    $(USRDIR)/wait_short.o $(USRDIR)/wait_long.o $(USRDIR)/pipe.o $(TESTDIR)/forktest.o \
-		$(TESTDIR)/torture.o
+		$(TESTDIR)/torture.o $(TESTDIR)/bigstack.o $(TESTDIR)/zero.o
 
 #List all of the header files necessary for your user programs
 USER_INCS = 
