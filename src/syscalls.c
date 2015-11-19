@@ -855,17 +855,13 @@ int Yalnix_TtyWrite(int tty_id, void *buf, int len) {
     } else { 
       TtyTransmit(tty_id, buf, len); 
     } 
-    
-    // we've returned from transmit, but aren't finished writing. 
-    // so switch to another proc until we're done
-    switch_to_next_available_proc(curr_proc->uc, 0);
-    TracePrintf(1, "PID: %d Finished transmitting.\n", curr_proc->proc_id);
   } else {
     TracePrintf(1, "PID: %d Other writers exist, I'll do my writing when I'm woken up in trap transmit\n", curr_proc->proc_id);
   }
 
+  switch_to_next_available_proc(curr_proc->uc, 0);
 
-
+  TracePrintf(1, "PID: %d Finished transmitting.\n", curr_proc->proc_id);
   TracePrintf(1, "End: TtyWrite\n");
   return len;
 } 
