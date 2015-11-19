@@ -297,8 +297,8 @@ void KernelStart(char *cmd_args[],
     // Load the program from the text file
     if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
       TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
-      // Is there more that needs to be done here?
-    }
+      exit(ERROR);
+    } 
 
   } else {
       arg_count = 0;
@@ -320,8 +320,7 @@ void KernelStart(char *cmd_args[],
     // Load the program from the text file
     if ((lp_rc = LoadProgram(progname, arglist, init_proc)) != SUCCESS) {
       TracePrintf(3, "LoadProgram failed with code %d\n", lp_rc);
-      
-      // Is there more that needs to be done here?
+      exit(ERROR);
     }
 
   }

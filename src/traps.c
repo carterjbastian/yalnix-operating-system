@@ -10,6 +10,16 @@
 #include "linked_list.h"
 #include "traps.h"
 
+/*
+ * Private Helper Functions
+ */ 
+int chk_range(u_long ptr);                                                      
+int chk_valid(u_long ptr);                                                      
+int chk_read(u_long ptr);                                                       
+int chk_write(u_long ptr);                                                      
+int chk_rw(u_long ptr); 
+int chk_str(u_long ptr, int len);
+
 // used by a couple different traps
 void abort_current_process(int exit_code, UserContext *uc) {
   TracePrintf(1, "Kernel Trap Handler: Aborting Current Process. PID: %d, exit_code: %d\n", 
@@ -50,6 +60,22 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_EXEC:
+        if (chk_range(uc->regs[0]) || chk_range(uc->regs[1])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer out of range\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_valid(uc->regs[0]) || chk_valid(uc->regs[1])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer to invalid page\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_rw(uc->regs[0]) || chk_rw(uc->regs[1])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: no read or write permissions for pointer argument\n");
+          retval = ERROR;
+          break;
+        }
+
         retval = Yalnix_Exec(uc);
         break;
 
@@ -59,6 +85,21 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_WAIT:
+        if (chk_range(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer out of range\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_valid(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer to invalid page\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_rw(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: no read or write permissions for pointer argument\n");
+          retval = ERROR;
+          break;
+        }
         stat_ptr = (int *) uc->regs[0];
         retval = Yalnix_Wait(stat_ptr, uc);
         break;
@@ -68,6 +109,21 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_BRK:
+        if (chk_range(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer out of range\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_valid(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer to invalid page\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_rw(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: no read or write permissions for pointer argument\n");
+          retval = ERROR;
+          break;
+        }
         addr = (void *) uc->regs[0];
         retval = Yalnix_Brk(addr);
         break;
@@ -78,6 +134,11 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
         
       case YALNIX_TTY_WRITE:
+        if (chk_str(uc->regs[1], uc->regs[2])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: invalid buffer passed to TTY_WRITE\n");
+          retval = ERROR;
+          break;
+        }
         tty_id = (int) uc->regs[0];
         buf = (void *) uc->regs[1];
         len = (int) uc->regs[2];
@@ -85,6 +146,12 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_TTY_READ:
+        if (chk_str(uc->regs[1], uc->regs[2])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: invalid buffer passed to TTY_READ\n");
+          retval = ERROR;
+          break;
+        }
+
         tty_id = (int) uc->regs[0];
         buf = (void *) uc->regs[1];
         len = (int) uc->regs[2];
@@ -108,6 +175,21 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_LOCK_INIT:
+        if (chk_range(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer out of range\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_valid(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer to invalid page\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_rw(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: no read or write permissions for pointer argument\n");
+          retval = ERROR;
+          break;
+        }
         retval = Yalnix_LockInit((int*)uc->regs[0]);
         break;
     
@@ -120,14 +202,43 @@ void HANDLE_TRAP_KERNEL(UserContext *uc) {
         break;
 
       case YALNIX_PIPE_INIT:
+
+        if (chk_range(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer out of range\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_valid(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: pointer to invalid page\n");
+          retval = ERROR;
+          break;
+        }
+        if (chk_rw(uc->regs[0])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: no read or write permissions for pointer argument\n");
+          retval = ERROR;
+          break;
+        }
+
+
         retval = Yalnix_PipeInit((int*)uc->regs[0]);
         break;
 
       case YALNIX_PIPE_READ:
+
+        if (chk_str(uc->regs[1], uc->regs[2])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: invalid string buffer passed to PipeRead\n");
+          retval = ERROR;
+          break;
+        }
         retval = Yalnix_PipeRead((int)uc->regs[0], (void *)uc->regs[1], (int)uc->regs[2]);
         break;
 
       case YALNIX_PIPE_WRITE:
+        if (chk_str(uc->regs[1], uc->regs[2])) {
+          TracePrintf(3, "\tSYSTEM CALL ERROR: invalid string buffer passed to PipeWrite\n");
+          retval = ERROR;
+          break;
+        }
         retval = Yalnix_PipeWrite((int)uc->regs[0], (void *)uc->regs[1], (int)uc->regs[2]);
         break;
 
@@ -413,4 +524,63 @@ void HANDLE_TRAP_TTY_TRANSMIT(UserContext *uc) {
 // To avoid errors by hardware
 void HANDLE_TRAP_DISK(UserContext *uc) { 
   
-} 
+}
+
+int chk_range(u_long ptr) {                                                         
+  if((unsigned int) ptr < VMEM_1_BASE || (unsigned int) ptr > VMEM_1_LIMIT)         
+    return 1;                                                                       
+  else                                                                              
+    return 0;                                                                       
+}                                                                                   
+                                                                                    
+int chk_valid(u_long ptr){                                                          
+  struct pte *ptr_pte;
+  ptr_pte = curr_proc->region1_pt + (ptr >> PAGESHIFT) - 128;
+
+  if (ptr_pte->valid != (u_long) 0x1)
+    return 1;
+  else
+    return 0;
+};                                                                                  
+                                                                                    
+int chk_read(u_long ptr) {                                                          
+  struct pte *ptr_pte;
+  ptr_pte = curr_proc->region1_pt + (ptr >> PAGESHIFT) - 128;
+
+  if (ptr_pte->prot | (u_long) PROT_READ)
+    return 0;
+  else
+    return 1;
+};                                                                                  
+                                                                                    
+int chk_write(u_long ptr) {                                                         
+  struct pte *ptr_pte;
+  ptr_pte = curr_proc->region1_pt + (ptr >> PAGESHIFT) - 128;
+
+  if (ptr_pte->prot | (u_long) PROT_WRITE)
+    return 0;
+  else
+    return 1;
+
+};                                                                                  
+                                                                                    
+int chk_rw(u_long ptr) {                                                            
+  return (chk_write(ptr) || chk_read(ptr));
+};
+
+int chk_str(u_long ptr, int len) {
+  u_long start_ptr = ptr;
+  u_long end_ptr = ptr + len;
+  int i;
+
+  for (i = 0; i < (len / PAGESIZE); i++) {
+    if (chk_range(ptr + (i * PAGESIZE)) ||
+        chk_valid(ptr + (i * PAGESIZE)) ||
+        chk_rw(ptr + (i * PAGESIZE))
+        )
+      return 1;
+  }
+
+  return 0;
+}
+
