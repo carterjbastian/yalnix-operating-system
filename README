@@ -1,3 +1,14 @@
+Yalnix Operating System
+
+Authors:  Carter J. Bastian, KC Beard
+          November 2015. 15F
+
+CAUTION: Viewing or using the code in this repository is a violation of the
+Dartmouth Honor Code if you are in or will ever be in CS58 (Operating Systems).
+
+Note that a full description and documentation of the project and the operating
+system is available in the file yalnix2015.pdf
+
 The contents of this folder are structured as follows:
 
 FILES:

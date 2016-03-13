@@ -1,0 +1,248 @@
+** Yalnix level 3 tracing enabled **
+** User Prog level 1 tracing enabled **
+Yalnix     Start: SetKernelData 
+Yalnix     End: SetKernelData 
+Yalnix     Start: SetKernelBrk
+Yalnix     Start: KernelStart 
+Yalnix     Virtual Memory Enabled!
+Yalnix     Start: new_process
+Yalnix     End: new_process
+Yalnix     Start: new_process
+Yalnix     End: new_process
+Yalnix     	==> LoadProgram
+Yalnix     counting arg 0 = './usr_progs/pipe'
+Yalnix     LoadProgram: argsize 17, argcount 1
+Yalnix     prog_size 4, text 2 data 1 bss 1 pages
+Yalnix     LoadProgram: heap_size 4, stack_size 1
+Yalnix     saving arg 0 = './usr_progs/pipe'
+Yalnix     	LoadProgram: Allocating pages for text
+Yalnix     	LoadProgram: Allocating pages for data
+Yalnix     	LoadProgram: Allocating pages for stack
+Yalnix     	LoadProgram: Reading Text
+Yalnix     	LoadProgram: Reading Data
+Yalnix     	LoadProgram: Copying page table to proc's pointer
+Yalnix     Past the memset
+Yalnix     Finished Loading in Program
+Yalnix     end: kernelstart
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     Start: MyKCSClone 
+Yalnix     End: MyKCSClone 
+Yalnix     Copied Kernel Context into next
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+User Prog  	===>pipe.c
+Yalnix     Starting: Yalnix_PipeInit
+Yalnix     Finishing: Yalnix_PipeInit
+User Prog  Pipe Initialized. ID = 0
+Yalnix     Start: Yalnix_Fork()
+Yalnix     Start: new_process
+Yalnix     End: new_process
+Yalnix     Creating the Page Table Mappings
+Yalnix     Finished Allocating Frames
+Yalnix     About to copy kernel pages
+Yalnix     About to copy Region 1 Pages
+Yalnix     About to restore the PTE for the destination page
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     Start: MyKCSClone 
+Yalnix     End: MyKCSClone 
+Yalnix     Copied Kernel Context into next
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     Returning to the child function
+Yalnix     End: Yalnix_Fork()
+Yalnix     	SYSTEM CALL ERROR: pointer to invalid page
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 2
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     Returning to the parent function
+Yalnix     End: Yalnix_Fork()
+Yalnix     	SYSTEM CALL ERROR: pointer to invalid page
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 1
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+User Prog  	CHILD: about to write to the lock
+Yalnix     Starting: Yalnix_PipeWrite
+Yalnix     Finishing: Yalnix_PipeWrite
+User Prog  	CHILD: wrote 4 characters to the lock
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 2
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 1
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+User Prog  	CHILD: pausing once
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 2
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+User Prog  	PARENT: reading 6 chars from the pipe (before it's ready
+Yalnix     Starting: Yalnix_PipeRead
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     Starting: Yalnix_PipeWrite
+Yalnix     Finishing: Yalnix_PipeWrite
+User Prog  	CHILD: wrote to the pipe again (2 chars)
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 2
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     Finishing: Yalnix_PipeRead
+User Prog  	PARENT: read 6 chars from the pipe. Results: abcdef
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 1
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     Start: Yalnix_Exit
+Yalnix     End: Yalnix_Exit
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     Switching processes
+Yalnix     Start: switch_to_next_available_proc 
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     Start: Yalnix_Exit
+Yalnix     End: Yalnix_Exit
+Yalnix     Start: perform_context_switch
+Yalnix     Start: MyKCSSwitch
+Yalnix     End: MyKCSSwitch
+Yalnix     End: perform_context_switch
+Yalnix     End: switch_to_next_available_proc 
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     No process to switch to or in proc 1- gonna keep going
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     No process to switch to or in proc 1- gonna keep going
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     No process to switch to or in proc 1- gonna keep going
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     No process to switch to or in proc 1- gonna keep going
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle
+Yalnix     Start: HANDLE_TRAP_CLOCK
+Yalnix     Proc Id: 0
+Yalnix     No process to switch to or in proc 1- gonna keep going
+Yalnix     End: HANDLE_TRAP_CLOCK
+Yalnix     	DoIdle

@@ -610,13 +610,3 @@ int SetKernelBrk(void * addr) {
     return 0;
   }
 }
-
-int bufferIsValid(char *ptr, int len, void* permissions) {
-
-
-}
-
-
-
-
-
